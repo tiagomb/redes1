@@ -10,7 +10,7 @@ typedef struct __attribute__((__packed__)) protocolo{
     unsigned int crc: 8;
 } protocolo_t;
 
-
+#define TIMEOUT 60000
 #define ACK 0
 #define NACK 1
 #define IGNORAR 2

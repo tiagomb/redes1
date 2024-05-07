@@ -26,12 +26,28 @@
 #include "buffer.h"
 #include "crc.h"
 
+int sequencia = 0;
+int last_seq = 31;
+
 void baixa_video(int soquete, int sequencia, protocolo_t *pacote, char *input){
 	envia_buffer(soquete, sequencia++, BAIXAR, input, strlen(input));
 	while (pacote->tipo != FIM_TRANSMISSAO){
 		switch (recebe_buffer(soquete, pacote)){
 			case ACK:
-				envia_buffer(soquete, sequencia++, ACK, NULL, 0);
+				switch (pacote->tipo){
+					case DESCRITOR:
+						envia_buffer(soquete, sequencia++, ACK, NULL, 0);
+						printf ("%s\n", pacote->dados);
+						break;
+					case DADOS:
+						envia_buffer(soquete, sequencia++, ACK, NULL, 0);
+						break;
+					case FIM_TRANSMISSAO:
+						envia_buffer(soquete, sequencia++, ACK, NULL, 0);
+						break;
+					default:
+						break;
+				}
 				break;
 			case NACK:
 				envia_buffer(soquete, sequencia++, NACK, NULL, 0);
@@ -61,15 +77,11 @@ void recebe_videos(int soquete, int sequencia, protocolo_t *pacote, char *input)
 	baixa_video(soquete, sequencia, pacote, input);
 }
 
-void trata_pacote(int soquete, int sequencia, char *input){
+void trata_pacote(int soquete, char *input){
 	protocolo_t pacote;
 	switch (recebe_buffer(soquete, &pacote)){
 		case ACK:
 			switch (pacote.tipo){
-				case LISTA:
-					break;
-				case BAIXAR:
-					break;
 				case MOSTRAR:
 					envia_buffer(soquete, sequencia++, ACK, NULL, 0);
 					printf ("%s\n", pacote.dados);
@@ -80,8 +92,6 @@ void trata_pacote(int soquete, int sequencia, char *input){
 				case DADOS:
 					break;
 				case FIM_TRANSMISSAO:
-					break;
-				case ERRO:
 					break;
 				default:
 					break;
@@ -97,10 +107,11 @@ void trata_pacote(int soquete, int sequencia, char *input){
 
 int main(int argc, char const* argv[]){
 	int soquete = cria_raw_socket("enp2s0f1");
-	int sequencia = 0;
+	struct timeval timeout = {TIMEOUT / 1000, (TIMEOUT % 1000) * 1000};
+	setsockopt(soquete, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 	char input[63];
 	while (1){
-		trata_pacote(soquete, sequencia, input);
+		trata_pacote(soquete, input);
 	}
 	close(soquete);
 	return 0;
