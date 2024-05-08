@@ -17,10 +17,26 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <sys/time.h>
+#include <time.h>
 
 
 int sequencia = 0;
 int last_seq = 31;
+
+unsigned int inc_seq(){
+    sequencia = (sequencia+1) % 32;
+    return sequencia;
+}
+
+unsigned int dec_seq(){
+    if (sequencia == 0){
+        sequencia = 31;
+    } else {
+        sequencia -= 1;
+    }
+    return sequencia;
+}
 
 void lista_videos(int soquete){
     DIR* diretorio = opendir("./videos");
@@ -30,66 +46,80 @@ void lista_videos(int soquete){
     while ((entrada = readdir(diretorio)) != NULL){
         if (strcmp(entrada->d_name, ".") && strcmp(entrada->d_name, "..")){
             snprintf(nome, 63, "%s", entrada->d_name);
-            if (sequencia == 31){
-                sequencia = 0;
-                aceito = envia_buffer(soquete, sequencia++, 16, nome, strlen(nome));
-                if (aceito == 1){
-                    sequencia--;
-                    while (aceito){
-                        aceito = envia_buffer(soquete, sequencia, 16, nome, strlen(nome));
-                    }
-                    sequencia++;
+            aceito = envia_buffer(soquete, inc_seq(), 16, nome, strlen(nome));
+            if (aceito == 1){
+                dec_seq();
+                while (aceito){
+                    aceito = envia_buffer(soquete, sequencia, 16, nome, strlen(nome));
                 }
-            } else {
-                aceito = envia_buffer(soquete, sequencia++, 16, nome, strlen(nome));
-                if (aceito == 1){
-                    sequencia--;
-                    while (aceito){
-                        aceito = envia_buffer(soquete, sequencia, 16, nome, strlen(nome));
-                    }
-                    sequencia++;
-                }
+                inc_seq();
             }
         }   
     }
-    aceito = envia_buffer(soquete, sequencia++, 30, NULL, 0);
+    aceito = envia_buffer(soquete, inc_seq(), 30, NULL, 0);
     if (aceito == 1){
-        sequencia--;
+        dec_seq();
         while (aceito == 1){
             aceito = envia_buffer(soquete, sequencia, 30, NULL, 0);
         }
-        sequencia++;
+        inc_seq();
     }
     closedir(diretorio);
 }
 
+void le_arquivo(char *nome){
+    FILE *arquivo = fopen(nome, "rb");
+    unsigned char *buffer = malloc(63);
+    int lidos = 0;
+    while ((lidos = fread(buffer, 1, 63, arquivo)) > 0){
+        int aceito = envia_buffer(soquete, inc_seq(), DADOS, buffer, lidos);
+        if (aceito == 1){
+            dec_seq();
+            while (aceito){
+                aceito = envia_buffer(soquete, sequencia, DADOS, buffer, lidos);
+            }
+            inc_seq();
+        }
+    }
+    fclose(arquivo);
+    envia_buffer(soquete, inc_seq(), FIM_TRANSMISSAO, NULL, 0);
+}
+
 void manda_video(int soquete, protocolo_t pacote){
-    char nome[63] = { 0 };
-    char *buffer = malloc (sizeof(protocolo_t));
-    protocolo_t *pacote_envio = (protocolo_t*) buffer;
-    snprintf(nome, 63, "./videos/%s", pacote.dados);
+    char nome[73] = { 0 };
+    unsigned char *buffer = malloc(63);
+    snprintf(nome, 73, "./videos/%s", pacote.dados);
     struct stat info;
     if (stat(nome, &info) == -1){
         switch (errno){
             case EACCES:
-                envia_buffer(soquete, sequencia++, ERRO, 1, 21);
+                envia_buffer(soquete, inc_seq(), ERRO, 1, 21);
                 break;
             case ENOENT:
-                envia_buffer(soquete, sequencia++, ERRO, 2, 21);
+                envia_buffer(soquete, inc_seq(), ERRO, 2, 21);
                 break;
             default:
-                envia_buffer(soquete, sequencia++, ERRO, "Erro desconhecido", 16);
+                envia_buffer(soquete, inc_seq(), ERRO, "Erro desconhecido", 16);
                 break;
         }
     }
-    snprintf(pacote_envio->dados, 63, "%ld %ld", info.st_size/1000000, info.st_ctime.tv_sec);
-    envia_buffer(soquete, sequencia++, DESCRITOR, pacote_envio->dados, strlen(pacote_envio->dados));
+    snprintf(buffer, 63, "%ld%ld", info.st_size/1000000, info.st_ctime);
+    int aceito = envia_buffer(soquete, inc_seq(), DESCRITOR, buffer, strlen(buffer));
+    if (aceito == 1){
+        dec_seq();
+        while (aceito){
+            aceito = envia_buffer(soquete, sequencia, DESCRITOR, buffer, strlen(buffer));
+        }
+        inc_seq();
+    }
+    le_arquivo(nome);
 }
 
 void trata_pacote(int soquete){
 	protocolo_t pacote;
 	switch (recebe_buffer(soquete, &pacote)){
 		case ACK:
+            envia_buffer(soquete, inc_seq(), ACK, NULL, 0);
 			switch (pacote.tipo){
 				case LISTA:
                     lista_videos(soquete);
@@ -102,7 +132,7 @@ void trata_pacote(int soquete){
 			}
 			break;
 		case NACK:
-			envia_buffer(soquete, sequencia++, NACK, NULL, 0);
+			envia_buffer(soquete, inc_seq(), NACK, NULL, 0);
 			break;
 		default:
 			break;
