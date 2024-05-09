@@ -14,7 +14,22 @@ long long int timestamp(){
     return tv.tv_sec * 1000 + tv.tv_usec/1000;
 }
 
-int envia_buffer(int soquete, unsigned int sequencia, unsigned int tipo, unsigned char* dados, unsigned int tamanho){
+unsigned int inc_seq(unsigned int *sequencia){
+    *sequencia = (*sequencia + 1) % 32;
+    return *sequencia;
+}
+
+unsigned int dec_seq(unsigned int *sequencia){
+    if (*sequencia == 0){
+        *sequencia = 31;
+    } else {
+        *sequencia -= 1;
+    }
+    return *sequencia;
+    
+}
+
+int envia_buffer(int soquete, unsigned int sequencia, unsigned int tipo, unsigned char* dados, unsigned int tamanho, unsigned int *last_seq){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
     protocolo_t *pacote = (protocolo_t*) buffer;
     pacote->marcador = 126;
@@ -54,17 +69,34 @@ int recebe_msg(int soquete, unsigned char *buffer){
     return -1;
 }
 
-int recebe_buffer(int soquete, protocolo_t *pacote){
+int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
+    unsigned int seq_esperada = inc_seq(last_seq);
     protocolo_t *pacote_recebido = (protocolo_t*) buffer;
     int recebido = recebe_msg(soquete, buffer);
     if (recebido == -1) {
         fprintf(stderr, "Timeout %s\n", strerror(errno));
         free(buffer);
-        return ERRO;
+        return TIMEOUT;
+    }
+    if (pacote_recebido->tipo == ERRO){
+        fprintf(stderr, "Erro ao receber pacote: %s\n", pacote_recebido->dados);
+        free(buffer);
+        exit(1);
+    }
+    if ((pacote_recebido->tipo == ACK || pacote_recebido->tipo == NACK) && pacote_recebido->sequencia == seq_esperada){
+        memcpy(pacote, pacote_recebido, sizeof(protocolo_t));
+        free(buffer);
+        return pacote_recebido->tipo;
     }
     if (recebido == 0 || calculaCRC(&buffer[1], sizeof(protocolo_t) - 1, tabela_crc) != 0){
         free(buffer);
+        return NACK;
+    }
+    if (pacote_recebido->sequencia != seq_esperada){
+        free(buffer);
+        printf("Sequencia esperada: %d, recebida: %d\n", seq_esperada, pacote_recebido->sequencia);
+        dec_seq(last_seq);
         return NACK;
     }
     memcpy(pacote, pacote_recebido, sizeof(protocolo_t));

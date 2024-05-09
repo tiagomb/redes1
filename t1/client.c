@@ -29,49 +29,36 @@
 #include "crc.h"
 
 
-int sequencia = 0;
-int last_seq = 31;
+unsigned int sequencia = 0;
+unsigned int last_seq = 31;
 
-unsigned int inc_seq(){
-	sequencia = (sequencia + 1) % 32;
-	return sequencia;
-}
-
-unsigned int dec_seq(){
-	if (sequencia == 0){
-		sequencia = 31;
-	} else {
-		sequencia -= 1;
-	}
-	return sequencia;
-}
-
-void escreve_arquivo(protocolo_t pacote, char *nome){
-	char *caminho = (char*) malloc(strlen(nome) + 9);
+void escreve_arquivo(int soquete, protocolo_t pacote, char *nome){
+	char *caminho = (char*) malloc(strlen(nome) + 10);
 	unsigned char *buffer = malloc(63);
 	long int tam, data;
 	sscanf(pacote.dados, "%ld %ld", &tam, &data);
 	struct statvfs stat;
 	statvfs("./videos", &stat);
 	if ((tam + 5) * 1000000 > stat.f_bsize * stat.f_bavail){
+		printf ("%ld\n", tam);
 		snprintf(buffer, 63, "%d", 3);
-		envia_buffer(soquete, inc_seq(), ERRO, buffer, strlen(buffer));
+		envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen(buffer), &last_seq);
 		return;
 	}
-	snprintf(caminho, strlen(nome) + 9, "./videos/%s", nome);
+	snprintf(caminho, strlen(nome) + 10, "./videos/%s", nome);
 	FILE *arquivo = fopen(caminho, "w");
 	while (pacote.tipo != FIM_TRANSMISSAO){
-		switch (recebe_buffer(soquete, &pacote)){
+		switch (recebe_buffer(soquete, &pacote, &last_seq)){
 			case ACK:
 				if (pacote.tipo == DADOS){
 					fwrite(pacote.dados, 1, pacote.tamanho, arquivo);
-					envia_buffer(soquete, inc_seq(), ACK, NULL, 0);
+					envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
 				} else {
-					envia_buffer(soquete, inc_seq(), NACK, NULL, 0);
+					envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
 				}
 				break;
 			case NACK:
-				envia_buffer(soquete, inc_seq(), NACK, NULL, 0);
+				envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
 				break;
 			default:
 				break;
@@ -80,43 +67,42 @@ void escreve_arquivo(protocolo_t pacote, char *nome){
 	fclose(arquivo);
 }
 
-void baixa_video(int soquete, int sequencia, protocolo_t *pacote, char *input){
-	int aceito = envia_buffer(soquete, inc_seq(), BAIXAR, input, strlen(input));
+void baixa_video(int soquete, int sequencia, protocolo_t pacote, char *input){
+	int aceito = envia_buffer(soquete, inc_seq(&sequencia), BAIXAR, input, strlen(input), &last_seq);
 	if (aceito == 1){
 		dec_seq();
 		while (aceito){
-			aceito = envia_buffer(soquete, sequencia, BAIXAR, input, strlen(input));
+			aceito = envia_buffer(soquete, sequencia, BAIXAR, input, strlen(input), &last_seq);
 		}
-		inc_seq();
+		inc_seq(&sequencia);
 	}
-	switch (recebe_buffer(soquete, pacote)){
+	switch (recebe_buffer(soquete, &pacote, &last_seq)){
 		case ACK:
-			if (pacote->tipo == DESCRITOR){
-				escreve_arquivo(pacote, input);
-				envia_buffer(soquete, inc_seq(), ACK, NULL, 0);
-				printf ("%s\n", pacote->dados);
+			if (pacote.tipo == DESCRITOR){
+				printf ("%s\n", pacote.dados);
+				envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
+				escreve_arquivo(soquete, pacote, input);
 			} else {
-				envia_buffer(soquete, inc_seq(), NACK, NULL, 0);
+				envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
 			}
 			break;
-			case NACK:
-				envia_buffer(soquete, inc_seq(), NACK, NULL, 0);
-				break;
-			default:
-				break;
+		case NACK:
+			envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
+			break;
+		default:
+			break;
 		}
-	}
 }
 
-void recebe_videos(int soquete, int sequencia, protocolo_t *pacote, char *input){
-	while (pacote->tipo != FIM_TRANSMISSAO){
-		switch (recebe_buffer(soquete, pacote)){
+void recebe_videos(int soquete, int sequencia, protocolo_t pacote, char *input){
+	while (pacote.tipo != FIM_TRANSMISSAO){
+		switch (recebe_buffer(soquete, &pacote, &last_seq)){
 			case ACK:
-				envia_buffer(soquete, inc_seq(), ACK, NULL, 0);
-				printf ("%s\n", pacote->dados);
+				envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
+				printf ("%s\n", pacote.dados);
 				break;
 			case NACK:
-				envia_buffer(soquete, inc_seq(), NACK, NULL, 0);
+				envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
 				break;
 			default:
 				break;
@@ -124,19 +110,19 @@ void recebe_videos(int soquete, int sequencia, protocolo_t *pacote, char *input)
 	}
 	printf ("Escolha o vídeo que deseja assistir: ");
 	scanf ("%s", input);
-	memset(pacote, 0, sizeof(protocolo_t));
+	memset(&pacote, 0, sizeof(protocolo_t));
 	baixa_video(soquete, sequencia, pacote, input);
 }
 
 void trata_pacote(int soquete, char *input){
 	protocolo_t pacote;
-	switch (recebe_buffer(soquete, &pacote)){
+	switch (recebe_buffer(soquete, &pacote, &last_seq)){
 		case ACK:
 			switch (pacote.tipo){
 				case MOSTRAR:
-					envia_buffer(soquete, inc_seq(), ACK, NULL, 0);
+					envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
 					printf ("%s\n", pacote.dados);
-					recebe_videos(soquete, sequencia, &pacote, input);
+					recebe_videos(soquete, sequencia, pacote, input);
 					break;
 				case DESCRITOR:
 					break;
@@ -149,7 +135,7 @@ void trata_pacote(int soquete, char *input){
 			}
 			break;
 		case NACK:
-			envia_buffer(soquete, inc_seq(), NACK, NULL, 0);
+			envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
 			break;
 		default:
 			break;
