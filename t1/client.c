@@ -29,7 +29,7 @@
 #include "crc.h"
 
 
-unsigned int sequencia = 0;
+unsigned int sequencia = 31;
 unsigned int last_seq = 31;
 
 void escreve_arquivo(int soquete, protocolo_t pacote, char *nome){
@@ -43,7 +43,7 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome){
 		printf ("%ld\n", tam);
 		snprintf(buffer, 63, "%d", 3);
 		envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen(buffer), &last_seq);
-		return;
+		exit(1);
 	}
 	snprintf(caminho, strlen(nome) + 10, "./videos/%s", nome);
 	FILE *arquivo = fopen(caminho, "w");
@@ -53,8 +53,9 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome){
 				if (pacote.tipo == DADOS){
 					fwrite(pacote.dados, 1, pacote.tamanho, arquivo);
 					envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
-				} else {
-					envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
+				} else if (pacote.tipo == FIM_TRANSMISSAO){
+					envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
+					fclose(arquivo);
 				}
 				break;
 			case NACK:
@@ -64,17 +65,14 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome){
 				break;
 		}
 	}
-	fclose(arquivo);
 }
 
 void baixa_video(int soquete, int sequencia, protocolo_t pacote, char *input){
 	int aceito = envia_buffer(soquete, inc_seq(&sequencia), BAIXAR, input, strlen(input), &last_seq);
 	if (aceito == 1){
-		dec_seq();
 		while (aceito){
 			aceito = envia_buffer(soquete, sequencia, BAIXAR, input, strlen(input), &last_seq);
 		}
-		inc_seq(&sequencia);
 	}
 	switch (recebe_buffer(soquete, &pacote, &last_seq)){
 		case ACK:
