@@ -90,13 +90,11 @@ int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq){
         return tipo;
     }
     if (recebido == 0 || calculaCRC(&buffer[1], sizeof(protocolo_t) - 1, tabela_crc) != 0){
-        printf ("nao aceitei aqui\n");
         dec_seq(last_seq);
         free(buffer);
         return NACK;
     }
     if (pacote_recebido->sequencia != seq_esperada){
-        printf ("sequencia errada\n");
         dec_seq(last_seq);
         free(buffer);
         return NACK;
