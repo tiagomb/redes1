@@ -94,7 +94,6 @@ int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq){
         return NACK;
     }
     if (pacote_recebido->sequencia != seq_esperada){
-        printf("Sequencia esperada: %d, recebida: %d\n", seq_esperada, pacote_recebido->sequencia);
         dec_seq(last_seq);
         free(buffer);
         return NACK;
