@@ -32,7 +32,7 @@
 unsigned int sequencia = 31;
 unsigned int last_seq = 31;
 
-void escreve_arquivo(int soquete, protocolo_t pacote, char *nome){
+void escreve_arquivo(int soquete, int sequencia, protocolo_t pacote, char *nome){
 	char *caminho = (char*) malloc(strlen(nome) + 10);
 	unsigned char *buffer = malloc(63);
 	long int tam, data;
@@ -45,6 +45,7 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome){
 		envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen(buffer), &last_seq);
 		exit(1);
 	}
+	envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
 	snprintf(caminho, strlen(nome) + 10, "./videos/%s", nome);
 	FILE *arquivo = fopen(caminho, "w");
 	while (pacote.tipo != FIM_TRANSMISSAO){
@@ -56,6 +57,7 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome){
 				} else if (pacote.tipo == FIM_TRANSMISSAO){
 					envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
 					fclose(arquivo);
+					exit(0);
 				}
 				break;
 			case NACK:
@@ -78,8 +80,7 @@ void baixa_video(int soquete, int sequencia, protocolo_t pacote, char *input){
 		case ACK:
 			if (pacote.tipo == DESCRITOR){
 				printf ("%s\n", pacote.dados);
-				envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
-				escreve_arquivo(soquete, pacote, input);
+				escreve_arquivo(soquete, sequencia, pacote, input);
 			} else {
 				envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
 			}
