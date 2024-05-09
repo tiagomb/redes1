@@ -46,8 +46,7 @@ int envia_buffer(int soquete, unsigned int sequencia, unsigned int tipo, unsigne
         return -1;
     }
     if (pacote->tipo != ACK && pacote->tipo != NACK){
-        free(buffer);
-        return recebe_buffer(soquete, pacote);
+        return recebe_buffer(soquete, pacote, last_seq);
     }
     free(buffer);
     return 0;
@@ -85,18 +84,19 @@ int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq){
         exit(1);
     }
     if ((pacote_recebido->tipo == ACK || pacote_recebido->tipo == NACK) && pacote_recebido->sequencia == seq_esperada){
-        memcpy(pacote, pacote_recebido, sizeof(protocolo_t));
+        int tipo = pacote_recebido->tipo;
+        free(pacote);
         free(buffer);
-        return pacote_recebido->tipo;
+        return tipo;
     }
     if (recebido == 0 || calculaCRC(&buffer[1], sizeof(protocolo_t) - 1, tabela_crc) != 0){
         free(buffer);
         return NACK;
     }
     if (pacote_recebido->sequencia != seq_esperada){
-        free(buffer);
         printf("Sequencia esperada: %d, recebida: %d\n", seq_esperada, pacote_recebido->sequencia);
         dec_seq(last_seq);
+        free(buffer);
         return NACK;
     }
     memcpy(pacote, pacote_recebido, sizeof(protocolo_t));

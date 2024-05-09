@@ -21,7 +21,7 @@
 #include <time.h>
 
 
-unsigned int sequencia = 0;
+unsigned int sequencia = 31;
 unsigned int last_seq = 31;
 
 void lista_videos(int soquete){
@@ -34,21 +34,17 @@ void lista_videos(int soquete){
             snprintf(nome, 63, "%s", entrada->d_name);
             aceito = envia_buffer(soquete, inc_seq(&sequencia), 16, nome, strlen(nome), &last_seq);
             if (aceito == 1){
-                dec_seq(&sequencia);
                 while (aceito){
                     aceito = envia_buffer(soquete, sequencia, 16, nome, strlen(nome), &last_seq);
                 }
-                inc_seq(&sequencia);
             }
         }   
     }
     aceito = envia_buffer(soquete, inc_seq(&sequencia), 30, NULL, 0, &last_seq);
     if (aceito == 1){
-        dec_seq(&sequencia);
         while (aceito == 1){
             aceito = envia_buffer(soquete, sequencia, 30, NULL, 0, &last_seq);
         }
-        inc_seq(&sequencia);
     }
     closedir(diretorio);
 }
@@ -60,11 +56,9 @@ void le_arquivo(int soquete, char *nome){
     while ((lidos = fread(buffer, 1, 63, arquivo)) > 0){
         int aceito = envia_buffer(soquete, inc_seq(&sequencia), DADOS, buffer, lidos, &last_seq);
         if (aceito == 1){
-            dec_seq(&sequencia);
             while (aceito){
                 aceito = envia_buffer(soquete, sequencia, DADOS, buffer, lidos, &last_seq);
             }
-            inc_seq(&sequencia);
         }
     }
     fclose(arquivo);
@@ -79,10 +73,10 @@ void manda_video(int soquete, protocolo_t pacote){
     if (stat(nome, &info) == -1){
         switch (errno){
             case EACCES:
-                envia_buffer(soquete, inc_seq(&sequencia), ERRO, '1', 1, &last_seq);
+                envia_buffer(soquete, inc_seq(&sequencia), ERRO, "1", 1, &last_seq);
                 break;
             case ENOENT:
-                envia_buffer(soquete, inc_seq(&sequencia), ERRO, '2', 1, &last_seq);
+                envia_buffer(soquete, inc_seq(&sequencia), ERRO, "2", 1, &last_seq);
                 break;
             default:
                 envia_buffer(soquete, inc_seq(&sequencia), ERRO, "Erro desconhecido", 16, &last_seq);
@@ -91,14 +85,12 @@ void manda_video(int soquete, protocolo_t pacote){
         exit(1);
     }
     envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
-    snprintf(buffer, 63, "%ld%ld", info.st_size/1000000, info.st_ctime);
+    snprintf(buffer, 63, "%ld %ld", info.st_size/1000000, info.st_ctime);
     int aceito = envia_buffer(soquete, inc_seq(&sequencia), DESCRITOR, buffer, strlen(buffer), &last_seq);
     if (aceito == 1){
-        dec_seq(&sequencia);
         while (aceito){
             aceito = envia_buffer(soquete, sequencia, DESCRITOR, buffer, strlen(buffer), &last_seq);
         }
-        inc_seq(&sequencia);
     }
     le_arquivo(soquete, nome);
 }

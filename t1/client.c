@@ -29,7 +29,7 @@
 #include "crc.h"
 
 
-unsigned int sequencia = 0;
+unsigned int sequencia = 31;
 unsigned int last_seq = 31;
 
 void escreve_arquivo(int soquete, protocolo_t pacote, char *nome){
@@ -70,11 +70,9 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome){
 void baixa_video(int soquete, int sequencia, protocolo_t pacote, char *input){
 	int aceito = envia_buffer(soquete, inc_seq(&sequencia), BAIXAR, input, strlen(input), &last_seq);
 	if (aceito == 1){
-		dec_seq();
 		while (aceito){
 			aceito = envia_buffer(soquete, sequencia, BAIXAR, input, strlen(input), &last_seq);
 		}
-		inc_seq(&sequencia);
 	}
 	switch (recebe_buffer(soquete, &pacote, &last_seq)){
 		case ACK:
