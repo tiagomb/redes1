@@ -56,15 +56,17 @@ void le_arquivo(int soquete, char *nome){
     while ((lidos = fread(buffer, 1, 63, arquivo)) > 0){
         removidos = insere_vlan(buffer);
         fseek(arquivo, -removidos, SEEK_CUR);
-        int aceito = envia_buffer(soquete, inc_seq(&sequencia), DADOS, buffer, lidos - removidos, &last_seq);
+        int aceito = envia_buffer(soquete, inc_seq(&sequencia), DADOS, buffer, lidos, &last_seq);
         if (aceito == 1){
             while (aceito){
-                aceito = envia_buffer(soquete, sequencia, DADOS, buffer, lidos - removidos, &last_seq);
+                aceito = envia_buffer(soquete, sequencia, DADOS, buffer, lidos, &last_seq);
             }
         }
+        memset(buffer, 0, 63);
     }
     fclose(arquivo);
     envia_buffer(soquete, inc_seq(&sequencia), FIM_TRANSMISSAO, NULL, 0, &last_seq);
+    exit(0);
 }
 
 void manda_video(int soquete, protocolo_t pacote){
