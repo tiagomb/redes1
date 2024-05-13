@@ -29,6 +29,33 @@ unsigned int dec_seq(unsigned int *sequencia){
     
 }
 
+int insere_vlan(unsigned char *dados){
+    int contador = 0;
+    for (int i = 0; i < 63; i++){
+        if (dados[i] == 129 || dados[i] == 136){
+            for (int j = 61; j > i; j--){
+                dados[j+1] = dados[j];
+            }
+            dados[i+1] = 255;
+            contador++;
+        }
+    }
+    return contador;
+}
+
+int remove_vlan(unsigned char *dados){
+    int contador = 0;
+    for (int i = 0; i < 63; i++){
+        if (dados[i] == 255){
+            for (int j = i; j < 62; j++){
+                dados[j] = dados[j+1];
+            }
+            contador++;
+        }
+    }
+    return contador;
+}
+
 int envia_buffer(int soquete, unsigned int sequencia, unsigned int tipo, unsigned char* dados, unsigned int tamanho, unsigned int *last_seq){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
     protocolo_t *pacote = (protocolo_t*) buffer;

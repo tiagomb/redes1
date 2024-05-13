@@ -52,12 +52,14 @@ void lista_videos(int soquete){
 void le_arquivo(int soquete, char *nome){
     FILE *arquivo = fopen(nome, "rb");
     unsigned char *buffer = malloc(63);
-    int lidos = 0;
+    int removidos, lidos = 0;
     while ((lidos = fread(buffer, 1, 63, arquivo)) > 0){
-        int aceito = envia_buffer(soquete, inc_seq(&sequencia), DADOS, buffer, lidos, &last_seq);
+        removidos = insere_vlan(buffer);
+        fseek(arquivo, -removidos, SEEK_CUR);
+        int aceito = envia_buffer(soquete, inc_seq(&sequencia), DADOS, buffer, lidos - removidos, &last_seq);
         if (aceito == 1){
             while (aceito){
-                aceito = envia_buffer(soquete, sequencia, DADOS, buffer, lidos, &last_seq);
+                aceito = envia_buffer(soquete, sequencia, DADOS, buffer, lidos - removidos, &last_seq);
             }
         }
     }
