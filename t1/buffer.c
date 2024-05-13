@@ -31,7 +31,7 @@ unsigned int dec_seq(unsigned int *sequencia){
 
 int insere_vlan(unsigned char *dados){
     int contador = 0;
-    for (int i = 0; i < 63; i++){
+    for (int i = 0; i < 62; i++){
         if (dados[i] == 129 || dados[i] == 136){
             for (int j = 61; j > i; j--){
                 dados[j+1] = dados[j];
@@ -45,8 +45,8 @@ int insere_vlan(unsigned char *dados){
 
 int remove_vlan(unsigned char *dados){
     int contador = 0;
-    for (int i = 0; i < 63; i++){
-        if (dados[i] == 255){
+    for (int i = 1; i < 63; i++){
+        if ((dados[i-1] == 129 || dados[i-1] == 136) && dados[i] == 255){
             for (int j = i; j < 62; j++){
                 dados[j] = dados[j+1];
             }

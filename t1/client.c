@@ -36,6 +36,7 @@ void escreve_arquivo(int soquete, int sequencia, protocolo_t pacote, char *nome)
 	char *caminho = (char*) malloc(strlen(nome) + 10);
 	unsigned char *buffer = malloc(63);
 	long int tam, data;
+	int removidos;
 	sscanf(pacote.dados, "%ld %ld", &tam, &data);
 	struct statvfs stat;
 	statvfs("./videos", &stat);
@@ -52,8 +53,8 @@ void escreve_arquivo(int soquete, int sequencia, protocolo_t pacote, char *nome)
 		switch (recebe_buffer(soquete, &pacote, &last_seq)){
 			case ACK:
 				if (pacote.tipo == DADOS){
-					remove_vlan(pacote.dados);
-					fwrite(pacote.dados, 1, pacote.tamanho, arquivo);
+					removidos = remove_vlan(pacote.dados);
+					fwrite(pacote.dados, 1, pacote.tamanho - removidos, arquivo);
 					envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
 				} else if (pacote.tipo == FIM_TRANSMISSAO){
 					envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
