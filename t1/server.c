@@ -30,7 +30,8 @@ void lista_videos(int soquete){
     struct dirent* entrada = NULL;
     int aceito = 0;
     while ((entrada = readdir(diretorio)) != NULL){
-        if (strcmp(entrada->d_name, ".") && strcmp(entrada->d_name, "..")){
+        char *extensao = strrchr(entrada->d_name, '.');
+        if (strcmp(entrada->d_name, ".") && strcmp(entrada->d_name, "..") && (strlen(entrada->d_name) <= 63) && (extensao == ".mp4" || extensao == ".avi")){
             snprintf(nome, 63, "%s", entrada->d_name);
             envia_buffer(soquete, inc_seq(&sequencia), 16, nome, strlen(nome), &last_seq);
             aceito = recebe_confirmacao(soquete, &last_seq);
@@ -181,9 +182,8 @@ void trata_pacote(int soquete){
 			}
 			break;
 		case NACK:
-			if (pacote.sequencia == dec_seq(&last_seq)){
+			if (pacote.sequencia == last_seq){
 				send(soquete, ultimo_enviado, sizeof(protocolo_t), 0);
-				inc_seq(&last_seq);
 			}
 			break;
 		default:

@@ -18,4 +18,6 @@ int envia_buffer(int soquete, unsigned int sequencia, unsigned int tipo, unsigne
 
 int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq);
 
+int recebe_confirmacao(int soquete, unsigned int *last_seq);
+
 #endif //buffer___h_
