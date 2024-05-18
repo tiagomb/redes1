@@ -63,9 +63,8 @@ void escreve_arquivo(int soquete, int sequencia, protocolo_t pacote, char *nome)
 				}
 				break;
 			case NACK:
-				if (pacote.sequencia == dec_seq(&last_seq)){
+				if (pacote.sequencia == last_seq){
 					send(soquete, ultimo_enviado, sizeof(protocolo_t), 0);
-					inc_seq(&last_seq);
 				}
 				break;
 			default:
@@ -102,9 +101,8 @@ void baixa_video(int soquete, int sequencia, protocolo_t pacote, char *input){
 			}
 			break;
 		case NACK:
-			if (pacote.sequencia == dec_seq(&last_seq)){
+			if (pacote.sequencia == last_seq){
 				send(soquete, ultimo_enviado, sizeof(protocolo_t), 0);
-				inc_seq(&last_seq);
 			}
 			break;
 		default:
@@ -120,9 +118,8 @@ void recebe_videos(int soquete, int sequencia, protocolo_t pacote, char *input){
 				printf ("%s\n", pacote.dados);
 				break;
 			case NACK:
-				if (pacote.sequencia == dec_seq(&last_seq)){
+				if (pacote.sequencia == last_seq){
 					send(soquete, ultimo_enviado, sizeof(protocolo_t), 0);
-					inc_seq(&last_seq);
 				}
 				break;
 			default:
@@ -156,9 +153,8 @@ void trata_pacote(int soquete, char *input){
 			}
 			break;
 		case NACK:
-			if (pacote.sequencia == dec_seq(&last_seq)){
+			if (pacote.sequencia == last_seq){
 				send(soquete, ultimo_enviado, sizeof(protocolo_t), 0);
-				inc_seq(&last_seq);
 			}
 			envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
 			break;
