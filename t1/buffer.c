@@ -8,6 +8,9 @@
 #include <sys/time.h>
 #include "crc.h"
 
+char ultimo_enviado[67] = { 0 };
+char ultimo_recebido[67] = { 0 };
+
 long long int timestamp(){
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -67,13 +70,11 @@ int envia_buffer(int soquete, unsigned int sequencia, unsigned int tipo, unsigne
     memcpy(pacote->dados, dados, tamanho);
     pacote->crc = calculaCRC(&buffer[1], sizeof(protocolo_t) - 2, tabela_crc);
     int enviado = send(soquete, buffer, sizeof(protocolo_t), 0);
+    memcpy(ultimo_enviado, buffer, sizeof(protocolo_t));
     if (enviado == -1) {
         fprintf(stderr, "Erro ao enviar pacote: %s\n", strerror(errno));
         free(buffer);
         return -1;
-    }
-    if (pacote->tipo != ACK && pacote->tipo != NACK){
-        return recebe_buffer(soquete, pacote, last_seq);
     }
     free(buffer);
     return 0;
@@ -85,6 +86,8 @@ int buffer_eh_valido(protocolo_t *pacote){
 
 int recebe_msg(int soquete, unsigned char *buffer){
     long long int comeco = timestamp();
+    struct timeval timeout = {TIMEOUT/1000, (TIMEOUT%1000)*1000};
+    setsockopt(soquete, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     int bytes_recebidos = 0;
     do{
         bytes_recebidos = recv(soquete, buffer, sizeof(protocolo_t), 0);
@@ -98,25 +101,14 @@ int recebe_msg(int soquete, unsigned char *buffer){
 int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
     unsigned int seq_esperada = inc_seq(last_seq);
+    struct timeval timeout = {0, 0};
+    setsockopt(soquete, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     protocolo_t *pacote_recebido = (protocolo_t*) buffer;
-    int recebido = recebe_msg(soquete, buffer);
-    if (recebido == -1) {
-        fprintf(stderr, "Timeout %s\n", strerror(errno));
-        free(buffer);
-        return TIMEOUT;
+    int recebido = recv(soquete, buffer, sizeof(protocolo_t), 0);
+    while (pacote_recebido->marcador != 126){
+        recebido = recv(soquete, buffer, sizeof(protocolo_t), 0);
     }
-    if (pacote_recebido->tipo == ERRO){
-        fprintf(stderr, "Erro ao receber pacote: %s\n", pacote_recebido->dados);
-        free(buffer);
-        exit(1);
-    }
-    if ((pacote_recebido->tipo == ACK || pacote_recebido->tipo == NACK) && pacote_recebido->sequencia == seq_esperada){
-        int tipo = pacote_recebido->tipo;
-        free(pacote);
-        free(buffer);
-        return tipo;
-    }
-    if (recebido == 0 || calculaCRC(&buffer[1], sizeof(protocolo_t) - 1, tabela_crc) != 0){
+    if (calculaCRC(&buffer[1], sizeof(protocolo_t) - 1, tabela_crc) != 0){
         dec_seq(last_seq);
         free(buffer);
         return NACK;
@@ -126,7 +118,31 @@ int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq){
         free(buffer);
         return NACK;
     }
+    memcpy(ultimo_recebido, buffer, sizeof(protocolo_t));
     memcpy(pacote, pacote_recebido, sizeof(protocolo_t));
     free(buffer);
     return ACK;
+}
+
+int recebe_confirmacao(int soquete, unsigned int *last_seq){
+    unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
+    protocolo_t *pacote = (protocolo_t*) buffer;
+    int recebido = recebe_msg(soquete, buffer);
+    if (recebido == -1) {
+        fprintf(stderr, "Timeout %s\n", strerror(errno));
+        free(buffer);
+        return TIMEOUT;
+    }
+    inc_seq(last_seq);
+    memcpy(ultimo_recebido, buffer, sizeof(protocolo_t));
+    if (pacote->tipo == ERRO){
+        fprintf(stderr, "Erro ao receber pacote: %s\n", pacote->dados);
+        free(buffer);
+        exit(1);
+    }
+    if (pacote->tipo == ACK || pacote->tipo == NACK){
+        int tipo = pacote->tipo;
+        free(buffer);
+        return tipo;
+    }
 }
