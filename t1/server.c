@@ -31,7 +31,7 @@ void lista_videos(int soquete){
     int aceito = 0;
     while ((entrada = readdir(diretorio)) != NULL){
         char *extensao = strrchr(entrada->d_name, '.');
-        if (strcmp(entrada->d_name, ".") && strcmp(entrada->d_name, "..") && (strlen(entrada->d_name) <= 63) && (extensao == ".mp4" || extensao == ".avi")){
+        if (strcmp(entrada->d_name, ".") && strcmp(entrada->d_name, "..")){
             snprintf(nome, 63, "%s", entrada->d_name);
             envia_buffer(soquete, inc_seq(&sequencia), 16, nome, strlen(nome), &last_seq);
             aceito = recebe_confirmacao(soquete, &last_seq);
@@ -120,7 +120,6 @@ void le_arquivo(int soquete, char *nome){
         default:
             break;
     }
-    exit(0);
 }
 
 void manda_video(int soquete, protocolo_t pacote){
@@ -177,6 +176,10 @@ void trata_pacote(int soquete){
 				case BAIXAR:
                     manda_video(soquete, pacote);
 					break;
+                case FIM_TRANSMISSAO:
+                    envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
+                    exit(0);
+                    break;
 				default:
 					break;
 			}
@@ -184,7 +187,9 @@ void trata_pacote(int soquete){
 		case NACK:
 			if (pacote.sequencia == last_seq){
 				send(soquete, ultimo_enviado, sizeof(protocolo_t), 0);
-			}
+			} else {
+                envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
+            }
 			break;
 		default:
 			break;
