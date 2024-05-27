@@ -145,4 +145,5 @@ int recebe_confirmacao(int soquete, unsigned int *last_seq){
         free(buffer);
         return tipo;
     }
+    return ERRO;
 }
