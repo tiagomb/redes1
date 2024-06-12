@@ -31,7 +31,7 @@ void lista_videos(int soquete){
     int aceito = 0;
     while ((entrada = readdir(diretorio)) != NULL){
         char *extensao = strrchr(entrada->d_name, '.');
-        if (strcmp(entrada->d_name, ".") && strcmp(entrada->d_name, "..")){
+        if (!strcmp(extensao, ".mp4") || !strcmp(extensao, ".avi")){
             snprintf(nome, 63, "%s", entrada->d_name);
             envia_buffer(soquete, inc_seq(&sequencia), 16, nome, strlen(nome), &last_seq);
             aceito = recebe_confirmacao(soquete, &last_seq);
