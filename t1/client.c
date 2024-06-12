@@ -42,7 +42,6 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome){
 	struct statvfs stat;
 	statvfs("./videos", &stat);
 	if ((tam + 5) * 1000000 > stat.f_bsize * stat.f_bavail){
-		printf ("%ld\n", tam);
 		snprintf((char *) buffer, 63, "%d", 3);
 		envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen((char *) buffer), &last_seq);
 		exit(1);
@@ -146,7 +145,7 @@ void baixa_video(int soquete, protocolo_t pacote, unsigned char *input){
 				escreve_arquivo(soquete, pacote, (char *) input);
 			} else {
 				envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
-			}
+			}		printf ("%ld\n", tam);
 			break;
 		case NACK:
 			if (pacote.sequencia == last_seq){

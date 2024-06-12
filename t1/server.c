@@ -31,6 +31,7 @@ void lista_videos(int soquete){
     int aceito = 0;
     while ((entrada = readdir(diretorio)) != NULL){
         char *extensao = strrchr(entrada->d_name, '.');
+        memset(nome, 0, 63);
         if ((!strcmp(extensao, ".mp4") || !strcmp(extensao, ".avi")) && strlen(entrada->d_name) <= 63){
             memcpy(nome, entrada->d_name, strlen(entrada->d_name));
             envia_buffer(soquete, inc_seq(&sequencia), 16, nome, strlen((char *) nome), &last_seq);
@@ -128,19 +129,18 @@ void manda_video(int soquete, protocolo_t pacote){
     snprintf(nome, 73, "./videos/%s", pacote.dados);
     struct stat info;
     if (stat(nome, &info) == -1){
-        unsigned char erro[8] = { 0 };
         switch (errno){
             case EACCES:
-                snprintf((char *) erro, 8, "%d", 1);
-                envia_buffer(soquete, inc_seq(&sequencia), ERRO, erro, 1, &last_seq);
+                snprintf((char *) buffer, 63, "%d", 1);
+                envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen((char *) buffer), &last_seq);
                 break;
             case ENOENT:
-                snprintf((char *) erro, 8, "%d", 2);
-                envia_buffer(soquete, inc_seq(&sequencia), ERRO, erro, 1, &last_seq);
+                snprintf((char *) buffer, 63, "%d", 2);
+                envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen((char *) buffer), &last_seq);
                 break;
             default:
-                snprintf((char *) erro, 8, "%d", 3);
-                envia_buffer(soquete, inc_seq(&sequencia), ERRO, erro, 16, &last_seq);
+                snprintf((char *) buffer, 63, "%d", 4);
+                envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen((char *) buffer), &last_seq);
                 break;
         }
         exit(1);

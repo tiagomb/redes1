@@ -138,9 +138,24 @@ int recebe_confirmacao(int soquete, unsigned int *last_seq){
     inc_seq(last_seq);
     memcpy(ultimo_recebido, buffer, sizeof(protocolo_t));
     if (pacote->tipo == ERRO){
-        fprintf(stderr, "Erro ao receber pacote: %s\n", pacote->dados);
+        int erro;
+        sscanf ((char *) pacote->dados, "%d", &erro);
+        switch (erro){
+            case 1:
+                fprintf(stderr, "Permissao negada\n");
+                break;
+            case 2:
+                fprintf(stderr, "Arquivo nao encontrado\n");
+                break;
+            case 4:
+                fprintf(stderr, "Sem espaço\n");
+                break;
+            default:
+                fprintf(stderr, "Erro desconhecido\n");
+                break;
+        }
         free(buffer);
-        exit(1);
+        exit(erro);
     }
     if (pacote->tipo == ACK || pacote->tipo == NACK){
         int tipo = pacote->tipo;
