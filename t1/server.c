@@ -26,26 +26,26 @@ unsigned int last_seq = 31;
 
 void lista_videos(int soquete){
     DIR* diretorio = opendir("./videos");
-    char nome[63] = { 0 };
+    unsigned char nome[63] = { 0 };
     struct dirent* entrada = NULL;
     int aceito = 0;
     while ((entrada = readdir(diretorio)) != NULL){
         char *extensao = strrchr(entrada->d_name, '.');
-        if (!strcmp(extensao, ".mp4") || !strcmp(extensao, ".avi")){
-            snprintf(nome, 63, "%s", entrada->d_name);
-            envia_buffer(soquete, inc_seq(&sequencia), 16, nome, strlen(nome), &last_seq);
+        if ((!strcmp(extensao, ".mp4") || !strcmp(extensao, ".avi")) && strlen(entrada->d_name) <= 63){
+            memcpy(nome, entrada->d_name, strlen(entrada->d_name));
+            envia_buffer(soquete, inc_seq(&sequencia), 16, nome, strlen((char *) nome), &last_seq);
             aceito = recebe_confirmacao(soquete, &last_seq);
             switch (aceito){
                 case ACK:
                     break;
                 case NACK:
                     while (aceito == NACK){
-                        envia_buffer(soquete, sequencia, 16, nome, strlen(nome), &last_seq);
+                        envia_buffer(soquete, sequencia, 16, nome, strlen((char *) nome), &last_seq);
                         aceito = recebe_confirmacao(soquete, &last_seq);
                     }
                     break;
                 case TIMEOUT:
-                    envia_buffer(soquete, sequencia, 16, nome, strlen(nome), &last_seq);
+                    envia_buffer(soquete, sequencia, 16, nome, strlen((char *) nome), &last_seq);
                     aceito = recebe_confirmacao(soquete, &last_seq);
                     break;
                 default:
@@ -128,34 +128,38 @@ void manda_video(int soquete, protocolo_t pacote){
     snprintf(nome, 73, "./videos/%s", pacote.dados);
     struct stat info;
     if (stat(nome, &info) == -1){
+        unsigned char erro[8] = { 0 };
         switch (errno){
             case EACCES:
-                envia_buffer(soquete, inc_seq(&sequencia), ERRO, "1", 1, &last_seq);
+                snprintf((char *) erro, 8, "%d", 1);
+                envia_buffer(soquete, inc_seq(&sequencia), ERRO, erro, 1, &last_seq);
                 break;
             case ENOENT:
-                envia_buffer(soquete, inc_seq(&sequencia), ERRO, "2", 1, &last_seq);
+                snprintf((char *) erro, 8, "%d", 2);
+                envia_buffer(soquete, inc_seq(&sequencia), ERRO, erro, 1, &last_seq);
                 break;
             default:
-                envia_buffer(soquete, inc_seq(&sequencia), ERRO, "Erro desconhecido", 16, &last_seq);
+                snprintf((char *) erro, 8, "%d", 3);
+                envia_buffer(soquete, inc_seq(&sequencia), ERRO, erro, 16, &last_seq);
                 break;
         }
         exit(1);
     }
     envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
-    snprintf(buffer, 63, "%ld %ld", info.st_size/1000000, info.st_ctime);
-    envia_buffer(soquete, inc_seq(&sequencia), DESCRITOR, buffer, strlen(buffer), &last_seq);
+    snprintf((char *) buffer, 63, "%ld %ld", info.st_size/1000000, info.st_ctime);
+    envia_buffer(soquete, inc_seq(&sequencia), DESCRITOR, buffer, strlen((char *) buffer), &last_seq);
     int aceito = recebe_confirmacao(soquete, &last_seq);
     switch (aceito){
         case ACK:
             break;
         case NACK:
             while (aceito == NACK){
-                envia_buffer(soquete, sequencia, DESCRITOR, buffer, strlen(buffer), &last_seq);
+                envia_buffer(soquete, sequencia, DESCRITOR, buffer, strlen((char *) buffer), &last_seq);
                 aceito = recebe_confirmacao(soquete, &last_seq);
             }
             break;
         case TIMEOUT:
-            envia_buffer(soquete, sequencia, DESCRITOR, buffer, strlen(buffer), &last_seq);
+            envia_buffer(soquete, sequencia, DESCRITOR, buffer, strlen((char *) buffer), &last_seq);
             aceito = recebe_confirmacao(soquete, &last_seq);
             break;
         default:

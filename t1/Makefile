@@ -1,4 +1,4 @@
-CFLAGS = -g
+CFLAGS = -g -Wall
 
 
 server: server.o crc.o conexao.o buffer.o
