@@ -51,7 +51,7 @@ void le_arquivo(int soquete, char *nome){
         fread(buffer, 1, TAMANHO, arquivo);
         removidos = insere_vlan(buffer);
         fseek(arquivo, -removidos, SEEK_CUR);
-        janela[i] = (protocolo_t *) monta_buffer(inc_seq(&sequencia), DADOS, buffer, TAMANHO, &last_seq);
+        janela[i] = (protocolo_t *) monta_buffer(inc_seq(&sequencia), DADOS, buffer, TAMANHO);
         send(soquete, janela[i], sizeof(protocolo_t), 0);
     }
     do{
@@ -71,7 +71,7 @@ void le_arquivo(int soquete, char *nome){
                     fread(buffer, 1, TAMANHO, arquivo);
                     removidos = insere_vlan(buffer);
                     fseek(arquivo, -removidos, SEEK_CUR);
-                    janela[i] = (protocolo_t *) monta_buffer(inc_seq(&sequencia), DADOS, buffer, TAMANHO, &last_seq);
+                    janela[i] = (protocolo_t *) monta_buffer(inc_seq(&sequencia), DADOS, buffer, TAMANHO);
                     send(soquete, janela[i], sizeof(protocolo_t), 0);
                 }
             case NACK:
@@ -126,15 +126,15 @@ void manda_video(int soquete, protocolo_t pacote, unsigned char *buffer_sequenci
 void trata_pacote(int soquete, unsigned char *buffer_sequencia){
 	protocolo_t pacote;
 	switch (recebe_buffer(soquete, &pacote, &last_seq)){
-        snprintf((char *) buffer_sequencia, TAMANHO, "%d", pacote.sequencia);
 		case ACK:
+            snprintf((char *) buffer_sequencia, TAMANHO, "%d", pacote.sequencia);
 			switch (pacote.tipo){
 				case LISTA:
                     envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char*) buffer_sequencia));
                     lista_videos(soquete);
 					break;
 				case BAIXAR:
-                    manda_video(soquete, pacote);
+                    manda_video(soquete, pacote, buffer_sequencia);
 					break;
                 case FIM_TRANSMISSAO:
                     envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char*) buffer_sequencia));
@@ -145,6 +145,7 @@ void trata_pacote(int soquete, unsigned char *buffer_sequencia){
 			}
 			break;
 		case NACK:
+            snprintf((char *) buffer_sequencia, TAMANHO, "%d", pacote.sequencia);
 			if (pacote.sequencia == last_seq){
 				send(soquete, ultimo_enviado, sizeof(protocolo_t), 0);
 			} else {
