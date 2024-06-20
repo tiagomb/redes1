@@ -44,7 +44,6 @@ void lista_videos(int soquete){
 void le_arquivo(int soquete, char *nome){
     FILE *arquivo = fopen(nome, "rb");
     unsigned char *buffer = malloc(TAMANHO);
-    protocolo_t *pacote;
     int removidos, lidos = 0;
     while ((lidos = fread(buffer, 1, TAMANHO, arquivo)) > 0){
         removidos = insere_vlan(buffer);
