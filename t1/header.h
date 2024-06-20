@@ -22,5 +22,6 @@ typedef struct __attribute__((__packed__)) protocolo{
 #define FIM_TRANSMISSAO 30
 #define ERRO 31
 #define JANELA 5
+#define TAMANHO 63
 
 #endif //header___h_

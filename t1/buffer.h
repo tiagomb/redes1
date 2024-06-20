@@ -14,10 +14,16 @@ int insere_vlan(unsigned char *dados);
 
 int remove_vlan(unsigned char *dados);
 
-int envia_buffer(int soquete, unsigned int sequencia, unsigned int tipo, unsigned char* dados, unsigned int tamanho, unsigned int *last_seq);
+unsigned char calculaCRC(unsigned char *message, unsigned int tamanho, unsigned char *table);
+
+char *monta_buffer(unsigned int sequencia, unsigned int tipo, unsigned char *dados, unsigned int tamanho);
+
+int envia_buffer(int soquete, unsigned int sequencia, unsigned int tipo, unsigned char* dados, unsigned int tamanho);
 
 int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq);
 
 int recebe_confirmacao(int soquete, unsigned int *last_seq);
+
+void trata_envio(int soquete, unsigned int *sequencia, unsigned int tipo, unsigned char *dados, unsigned int tamanho, unsigned int *last_seq);
 
 #endif //buffer___h_

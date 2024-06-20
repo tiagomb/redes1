@@ -6,7 +6,6 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <sys/time.h>
-#include "crc.h"
 
 char ultimo_enviado[67] = { 0 };
 char ultimo_recebido[67] = { 0 };
@@ -34,11 +33,19 @@ unsigned int dec_seq(unsigned int *sequencia){
     
 }
 
+unsigned char calculaCRC(unsigned char *message, unsigned int tamanho, unsigned char *table){
+    unsigned char crc = 0x00;
+    for (int i = 0; i < tamanho; i++){
+        crc = table[crc ^ message[i]];
+    }
+    return crc;
+}
+
 int insere_vlan(unsigned char *dados){
     int contador = 0;
-    for (int i = 0; i < 62; i++){
+    for (int i = 0; i < TAMANHO-1; i++){
         if (dados[i] == 129 || dados[i] == 136){
-            for (int j = 61; j > i; j--){
+            for (int j = TAMANHO-2; j > i; j--){
                 dados[j+1] = dados[j];
             }
             dados[i+1] = 255;
@@ -50,9 +57,9 @@ int insere_vlan(unsigned char *dados){
 
 int remove_vlan(unsigned char *dados){
     int contador = 0;
-    for (int i = 1; i < 63; i++){
+    for (int i = 1; i < TAMANHO; i++){
         if ((dados[i-1] == 129 || dados[i-1] == 136) && dados[i] == 255){
-            for (int j = i; j < 62; j++){
+            for (int j = i; j < TAMANHO-1; j++){
                 dados[j] = dados[j+1];
             }
             contador++;
@@ -61,18 +68,24 @@ int remove_vlan(unsigned char *dados){
     return contador;
 }
 
-int envia_buffer(int soquete, unsigned int sequencia, unsigned int tipo, unsigned char* dados, unsigned int tamanho, unsigned int *last_seq){
+char *monta_buffer(unsigned int sequencia, unsigned int tipo, unsigned char *dados, unsigned int tamanho){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
     protocolo_t *pacote = (protocolo_t*) buffer;
     pacote->marcador = 126;
     pacote->tamanho = tamanho;
     pacote->sequencia = sequencia;
     pacote->tipo = tipo;
-    memset(pacote->dados, 0, 63);
+    memset(pacote->dados, 0, TAMANHO);
     memcpy(pacote->dados, dados, tamanho);
     pacote->crc = calculaCRC(&buffer[1], sizeof(protocolo_t) - 2, tabela_crc);
-    int enviado = send(soquete, buffer, sizeof(protocolo_t), 0);
     memcpy(ultimo_enviado, buffer, sizeof(protocolo_t));
+    return buffer;
+
+}
+
+int envia_buffer(int soquete, unsigned int sequencia, unsigned int tipo, unsigned char* dados, unsigned int tamanho){
+    unsigned char *buffer = monta_buffer(sequencia, tipo, dados, tamanho, last_seq);
+    int enviado = send(soquete, buffer, sizeof(protocolo_t), 0);
     if (enviado == -1) {
         fprintf(stderr, "Erro ao enviar pacote: %s\n", strerror(errno));
         free(buffer);
@@ -126,14 +139,13 @@ int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq){
     return ACK;
 }
 
-int recebe_confirmacao(int soquete, unsigned int *last_seq){
+protocolo_t *recebe_confirmacao(int soquete, unsigned int *last_seq){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
     protocolo_t *pacote = (protocolo_t*) buffer;
     int recebido = recebe_msg(soquete, buffer);
     if (recebido == -1) {
-        fprintf(stderr, "Timeout %s\n", strerror(errno));
-        free(buffer);
-        return TIMEOUT;
+        pacote->tipo = TIMEOUT;
+        return pacote;
     }
     inc_seq(last_seq);
     memcpy(ultimo_recebido, buffer, sizeof(protocolo_t));
@@ -158,9 +170,38 @@ int recebe_confirmacao(int soquete, unsigned int *last_seq){
         exit(erro);
     }
     if (pacote->tipo == ACK || pacote->tipo == NACK){
-        int tipo = pacote->tipo;
-        free(buffer);
-        return tipo;
+        return pacote;
     }
-    return ERRO;
+    pacote->tipo = ERRO;
+    return pacote;
+}
+
+void trata_envio(int soquete, unsigned int *sequencia, unsigned int tipo, unsigned char *dados, unsigned int tamanho, unsigned int *last_seq){
+    envia_buffer(soquete, inc_seq(sequencia), tipo, dados, tamanho, last_seq);
+    protocolo_t *pacote = recebe_confirmacao(soquete, last_seq);
+    int aceito = pacote->tipo;
+    free(pacote);
+    switch (aceito){
+        case ACK:
+            break;
+        case NACK:
+            while (aceito == NACK){
+                envia_buffer(soquete, *sequencia, tipo, dados, tamanho, last_seq);
+                pacote = recebe_confirmacao(soquete, last_seq);
+                aceito = pacote->tipo;
+                free(pacote);
+            }
+            break;
+        case TIMEOUT:
+            envia_buffer(soquete, *sequencia, tipo, dados, tamanho, last_seq);
+            pacote = recebe_confirmacao(soquete, last_seq);
+            aceito = pacote->tipo;
+            break;
+        case ERRO:
+            fprintf(stderr, "Erro desconhecido\n");
+            exit(1);
+            break;
+        default:
+            break;
+    }
 }

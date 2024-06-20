@@ -26,92 +26,101 @@
 #include "conexao.h"
 #include "header.h"
 #include "buffer.h"
-#include "crc.h"
-
 
 unsigned int sequencia = 31;
 unsigned int last_seq = 31;
 
-void escreve_arquivo(int soquete, protocolo_t pacote, char *nome){
+int verifica_sequencias(protocolo_t pacote, unsigned int last_seq){
+	switch (last_seq){
+		case 0:
+			if (pacote.sequencia == 0 || pacote.sequencia == 31 || pacote.sequencia == 30 || pacote.sequencia == 29 || pacote.sequencia == 28){
+				return 1;
+			}
+			return 0;
+			break;
+		case 1:
+			if (pacote.sequencia == 1 || pacote.sequencia == 0 || pacote.sequencia == 31 || pacote.sequencia == 30 || pacote.sequencia == 29){
+				return 1;
+			}
+			return 0;
+			break;
+		case 2:
+			if (pacote.sequencia == 2 || pacote.sequencia == 1 || pacote.sequencia == 0 || pacote.sequencia == 31 || pacote.sequencia == 30){
+				return 1;
+			}
+			return 0;
+			break;
+		case 3:
+			if (pacote.sequencia == 3 || pacote.sequencia == 2 || pacote.sequencia == 1 || pacote.sequencia == 0 || pacote.sequencia == 31){
+				return 1;
+			}
+			return 0;
+			break;
+		default:
+			if (pacote.sequencia >= last_seq - 4 && pacote.sequencia <= last_seq){
+			return 1;
+			}
+			return 0;
+			break;
+	}
+}
+
+void pergunta_videos(int soquete){
+	printf ("Deseja baixar outro vídeo? (s/n): ");
+	char c;
+	getchar();
+	scanf ("%c", &c);
+	if (c == 'n' || c == 'N'){
+		trata_envio(soquete, &sequencia, FIM_TRANSMISSAO, NULL, 0, &last_seq);
+		exit(0);
+	} else {
+		trata_envio(soquete, &sequencia, LISTA, NULL, 0, &last_seq);
+	}
+}
+
+void toca_video(int soquete, char *caminho){
+	char *comando = (char*) malloc(strlen(caminho) + 10);
+	snprintf(comando, strlen(caminho) + 10, "xdg-open %s", caminho);
+	system(comando);
+	pergunta_videos(soquete);
+}
+
+void escreve_arquivo(int soquete, protocolo_t pacote, char *nome, unsigned char *buffer_sequencia){
 	char *caminho = (char*) malloc(strlen(nome) + 10);
-	char *comando = (char*) malloc(strlen(nome) + 20);
-	unsigned char *buffer = malloc(63);
+	unsigned char *buffer = (unsigned char *) malloc(TAMANHO);
 	long int tam, data;
 	int removidos;
 	sscanf((char *) pacote.dados, "%ld %ld", &tam, &data);
 	struct statvfs stat;
 	statvfs("./videos", &stat);
 	if ((tam + 5) * 1000000 > stat.f_bsize * stat.f_bavail){
-		snprintf((char *) buffer, 63, "%d", 3);
-		envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen((char *) buffer), &last_seq);
+		snprintf((char *) buffer, TAMANHO, "%d", 3);
+		envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen((char *) buffer));
 		exit(1);
 	}
-	envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
+	envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
 	snprintf(caminho, strlen(nome) + 10, "./videos/%s", nome);
 	FILE *arquivo = fopen(caminho, "w");
 	while (pacote.tipo != FIM_TRANSMISSAO){
 		switch (recebe_buffer(soquete, &pacote, &last_seq)){
+			snprintf((char *) buffer_sequencia, TAMANHO, "%d", pacote.sequencia);
 			case ACK:
 				if (pacote.tipo == DADOS){
 					removidos = remove_vlan(pacote.dados);
 					fwrite(pacote.dados, 1, pacote.tamanho - removidos, arquivo);
-					envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
+					envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
 				} else if (pacote.tipo == FIM_TRANSMISSAO){
-					envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
+					envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
 					fclose(arquivo);
-					snprintf(comando, strlen(caminho) + 10, "xdg-open %s", caminho);
-					system(comando);
-					printf ("Deseja baixar outro vídeo? (s/n): ");
-					char c;
-					getchar();
-					scanf ("%c", &c);
-					if (c == 'n' || c == 'N'){
-						envia_buffer(soquete, inc_seq(&sequencia), FIM_TRANSMISSAO, NULL, 0, &last_seq);
-						int aceito = recebe_confirmacao(soquete, &last_seq);
-						switch (aceito){
-							case ACK:
-								break;
-							case NACK:
-								while (aceito == NACK){
-									envia_buffer(soquete, sequencia, FIM_TRANSMISSAO, NULL, 0, &last_seq);
-									aceito = recebe_confirmacao(soquete, &last_seq);
-								}
-								break;
-							case TIMEOUT:
-								envia_buffer(soquete, sequencia, FIM_TRANSMISSAO, NULL, 0, &last_seq);
-								aceito = recebe_confirmacao(soquete, &last_seq);
-								break;
-							default:
-								break;
-						}
-						exit(0);
-					} else {
-						envia_buffer(soquete, inc_seq(&sequencia), LISTA, NULL, 0, &last_seq);
-						int aceito = recebe_confirmacao(soquete, &last_seq);
-						switch (aceito){
-							case ACK:
-								break;
-							case NACK:
-								while (aceito == NACK){
-									envia_buffer(soquete, sequencia, LISTA, NULL, 0, &last_seq);
-									aceito = recebe_confirmacao(soquete, &last_seq);
-								}
-								break;
-							case TIMEOUT:
-								envia_buffer(soquete, sequencia, LISTA, NULL, 0, &last_seq);
-								aceito = recebe_confirmacao(soquete, &last_seq);
-								break;
-							default:
-								break;
-						}
-					}
+					toca_video(soquete, caminho);
 				}
 				break;
 			case NACK:
-				if (pacote.sequencia == last_seq){
-					send(soquete, ultimo_enviado, sizeof(protocolo_t), 0);
+				if (verifica_sequencias(pacote, last_seq)){
+					snprintf((char *) buffer_sequencia, TAMANHO, "%d", pacote.sequencia);
+					envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
 				} else {
-					envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
+					envia_buffer(soquete, inc_seq(&sequencia), NACK, buffer_sequencia, strlen((char *) buffer_sequencia));
 				}
 				break;
 			default:
@@ -120,38 +129,18 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome){
 	}
 }
 
-void baixa_video(int soquete, protocolo_t pacote, unsigned char *input){
-	envia_buffer(soquete, inc_seq(&sequencia), BAIXAR, input, strlen((char *) input), &last_seq);
-	int aceito = recebe_confirmacao(soquete, &last_seq);
-	switch (aceito){
-		case ACK:
-			break;
-		case NACK:
-			while (aceito == NACK){
-				envia_buffer(soquete, sequencia, BAIXAR, input, strlen((char *) input), &last_seq);
-				aceito = recebe_confirmacao(soquete, &last_seq);
-			}
-			break;
-		case TIMEOUT:
-			envia_buffer(soquete, sequencia, BAIXAR, input, strlen((char *) input), &last_seq);
-			aceito = recebe_confirmacao(soquete, &last_seq);
-			break;
-		default:
-			break;
-	}
+void baixa_video(int soquete, protocolo_t pacote, unsigned char *input, unsigned char *buffer_sequencia){
+	trata_envio(soquete, &sequencia, BAIXAR, input, strlen((char *) input), &last_seq);
 	switch (recebe_buffer(soquete, &pacote, &last_seq)){
+		snprintf((char *) buffer_sequencia, TAMANHO, "%d", pacote.sequencia);
 		case ACK:
-			if (pacote.tipo == DESCRITOR){
-				escreve_arquivo(soquete, pacote, (char *) input);
-			} else {
-				envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
-			}		printf ("%ld\n", tam);
+			escreve_arquivo(soquete, pacote, (char *) input, buffer_sequencia);
 			break;
 		case NACK:
 			if (pacote.sequencia == last_seq){
 				send(soquete, ultimo_enviado, sizeof(protocolo_t), 0);
 			} else {
-				envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
+				envia_buffer(soquete, inc_seq(&sequencia), NACK, buffer_sequencia, strlen((char *) buffer_sequencia));
 			}
 			break;
 		default:
@@ -159,18 +148,19 @@ void baixa_video(int soquete, protocolo_t pacote, unsigned char *input){
 		}
 }
 
-void recebe_videos(int soquete, protocolo_t pacote, unsigned char *input){
+void recebe_videos(int soquete, protocolo_t pacote, unsigned char *input, unsigned char *buffer_sequencia){
 	while (pacote.tipo != FIM_TRANSMISSAO){
 		switch (recebe_buffer(soquete, &pacote, &last_seq)){
+			snprintf((char *) buffer_sequencia, TAMANHO, "%d", pacote.sequencia);
 			case ACK:
-				envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
+				envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
 				printf ("%s\n", pacote.dados);
 				break;
 			case NACK:
 				if (pacote.sequencia == last_seq){
 					send(soquete, ultimo_enviado, sizeof(protocolo_t), 0);
 				} else {
-					envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
+					envia_buffer(soquete, inc_seq(&sequencia), NACK, buffer_sequencia, strlen((char *) buffer_sequencia));
 				}
 				break;
 			default:
@@ -180,26 +170,24 @@ void recebe_videos(int soquete, protocolo_t pacote, unsigned char *input){
 	printf ("Escolha o vídeo que deseja assistir: ");
 	scanf ("%s", input);
 	memset(&pacote, 0, sizeof(protocolo_t));
-	baixa_video(soquete, pacote, input);
+	baixa_video(soquete, pacote, input, buffer_sequencia);
 }
 
-void trata_pacote(int soquete, unsigned char *input){
+void trata_pacote(int soquete, unsigned char *input, unsigned char *buffer_sequencia){
 	protocolo_t pacote;
 	switch (recebe_buffer(soquete, &pacote, &last_seq)){
 		case ACK:
 			switch (pacote.tipo){
 				case MOSTRAR:
-					envia_buffer(soquete, inc_seq(&sequencia), ACK, NULL, 0, &last_seq);
+					snprintf((char *) buffer_sequencia, TAMANHO, "%d", pacote.sequencia);
+					envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
 					printf ("%s\n", pacote.dados);
-					recebe_videos(soquete, pacote, input);
-					break;
-				case DESCRITOR:
-					break;
-				case DADOS:
-					break;
-				case FIM_TRANSMISSAO:
+					recebe_videos(soquete, pacote, input, buffer_sequencia);
 					break;
 				default:
+					snprintf((char *) buffer_sequencia, TAMANHO, "%d", 4);
+					envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, 0);
+					exit(1);
 					break;
 			}
 			break;
@@ -207,7 +195,8 @@ void trata_pacote(int soquete, unsigned char *input){
 			if (pacote.sequencia == last_seq){
 				send(soquete, ultimo_enviado, sizeof(protocolo_t), 0);
 			} else {
-				envia_buffer(soquete, inc_seq(&sequencia), NACK, NULL, 0, &last_seq);
+				snprintf((char *) buffer_sequencia, TAMANHO, "%d", pacote.sequencia);
+				envia_buffer(soquete, inc_seq(&sequencia), NACK, buffer_sequencia, strlen((char *) buffer_sequencia));
 			}
 			break;
 		default:
@@ -217,7 +206,7 @@ void trata_pacote(int soquete, unsigned char *input){
 
 int main(int argc, char const* argv[]){
 	int soquete = cria_raw_socket("enp2s0f1");
-	unsigned char input[63];
+	unsigned char input[TAMANHO], buffer_sequencia[TAMANHO];
 	DIR *dir = opendir("./videos");
 	if(dir){
 		closedir(dir);
@@ -226,7 +215,7 @@ int main(int argc, char const* argv[]){
 		dir = opendir("./videos");
 	}
 	while (1){
-		trata_pacote(soquete, input);
+		trata_pacote(soquete, input, buffer_sequencia);
 	}
 	close(soquete);
 	return 0;
