@@ -23,7 +23,7 @@
 unsigned int sequencia = 31;
 unsigned int last_seq = 31;
 
-protocolo_t *janela[JANELA] = { NULL, NULL, NULL, NULL, NULL };
+// protocolo_t *janela[JANELA] = { NULL, NULL, NULL, NULL, NULL };
 
 void lista_videos(int soquete){
     DIR* diretorio = opendir("./videos");
@@ -44,52 +44,14 @@ void lista_videos(int soquete){
 void le_arquivo(int soquete, char *nome){
     FILE *arquivo = fopen(nome, "rb");
     unsigned char *buffer = malloc(TAMANHO);
-    int diff = 0, aceito = 0;
     protocolo_t *pacote;
     int removidos, lidos = 0;
-    for (int i = 0; i < JANELA; i++){
-        fread(buffer, 1, TAMANHO, arquivo);
+    while ((lidos = fread(buffer, 1, TAMANHO, arquivo)) > 0){
         removidos = insere_vlan(buffer);
         fseek(arquivo, -removidos, SEEK_CUR);
-        janela[i] = (protocolo_t *) monta_buffer(inc_seq(&sequencia), DADOS, buffer, TAMANHO);
-        send(soquete, janela[i], sizeof(protocolo_t), 0);
+        trata_envio(soquete, &sequencia, DADOS, buffer, lidos, &last_seq);
+        memset(buffer, 0, TAMANHO);
     }
-    do{
-        pacote = recebe_confirmacao(soquete, &last_seq);
-        aceito = pacote->tipo;
-        switch (aceito){
-            case ACK:
-                diff = pacote->sequencia - janela[0]->sequencia + 1; //Caso um ACK, se perca e venha um ACK cumulativo, ajustamos a janela com base nisso.
-                for (int i = 0; i < diff; i++){
-                    free(janela[i]);
-                    janela[i] = janela[i+diff];
-                }
-                for (int i = diff; i < JANELA - diff; i++){
-                    janela[i] = janela[i+diff];
-                }
-                for (int i = JANELA - diff; i < JANELA; i++){
-                    fread(buffer, 1, TAMANHO, arquivo);
-                    removidos = insere_vlan(buffer);
-                    fseek(arquivo, -removidos, SEEK_CUR);
-                    janela[i] = (protocolo_t *) monta_buffer(inc_seq(&sequencia), DADOS, buffer, TAMANHO);
-                    send(soquete, janela[i], sizeof(protocolo_t), 0);
-                }
-            case NACK:
-                if (pacote->sequencia == janela[0]->sequencia){
-                    for (int i = 0; i < JANELA; i++){
-                        send(soquete, janela[i], sizeof(protocolo_t), 0);
-                    }
-                }
-                break;
-            case TIMEOUT:
-                for (int i = 0; i < JANELA; i++){
-                    send(soquete, janela[i], sizeof(protocolo_t), 0);
-                }
-                break;
-            default:
-                break;
-        }
-    } while ((lidos = fread(buffer, 1, TAMANHO, arquivo)) > 0);
     fclose(arquivo);
     trata_envio(soquete, &sequencia, FIM_TRANSMISSAO, NULL, 0, &last_seq);
 }

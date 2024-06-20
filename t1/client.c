@@ -117,7 +117,7 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome, unsigned char 
 				break;
 			case NACK:
 				snprintf((char *) buffer_sequencia, TAMANHO, "%d", pacote.sequencia);
-				if (verifica_sequencias(pacote, last_seq)){
+				if (pacote.sequencia == last_seq){
 					envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
 				} else {
 					envia_buffer(soquete, inc_seq(&sequencia), NACK, buffer_sequencia, strlen((char *) buffer_sequencia));
