@@ -186,7 +186,7 @@ void trata_pacote(int soquete, unsigned char *input, unsigned char *buffer_seque
 					break;
 				default:
 					snprintf((char *) buffer_sequencia, TAMANHO, "%d", 4);
-					envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, 0);
+					envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer_sequencia, 0);
 					exit(1);
 					break;
 			}

@@ -68,7 +68,7 @@ int remove_vlan(unsigned char *dados){
     return contador;
 }
 
-char *monta_buffer(unsigned int sequencia, unsigned int tipo, unsigned char *dados, unsigned int tamanho){
+unsigned char *monta_buffer(unsigned int sequencia, unsigned int tipo, unsigned char *dados, unsigned int tamanho){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
     protocolo_t *pacote = (protocolo_t*) buffer;
     pacote->marcador = 126;
@@ -84,7 +84,7 @@ char *monta_buffer(unsigned int sequencia, unsigned int tipo, unsigned char *dad
 }
 
 int envia_buffer(int soquete, unsigned int sequencia, unsigned int tipo, unsigned char* dados, unsigned int tamanho){
-    unsigned char *buffer = monta_buffer(sequencia, tipo, dados, tamanho, last_seq);
+    unsigned char *buffer = monta_buffer(sequencia, tipo, dados, tamanho);
     int enviado = send(soquete, buffer, sizeof(protocolo_t), 0);
     if (enviado == -1) {
         fprintf(stderr, "Erro ao enviar pacote: %s\n", strerror(errno));
@@ -101,7 +101,7 @@ int buffer_eh_valido(protocolo_t *pacote){
 
 int recebe_msg(int soquete, unsigned char *buffer){
     long long int comeco = timestamp();
-    struct timeval timeout = {TIMEOUT/1000, (TIMEOUT%1000)*1000};
+    struct timeval timeout = {30000/1000, (30000%1000)*1000};
     setsockopt(soquete, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     int bytes_recebidos = 0;
     do{
@@ -109,7 +109,7 @@ int recebe_msg(int soquete, unsigned char *buffer){
         if (buffer_eh_valido((protocolo_t*) buffer)){
             return bytes_recebidos;
         }
-    } while (timestamp() - comeco <= TIMEOUT);
+    } while (timestamp() - comeco <= 30000);
     return -1;
 }
 
@@ -177,7 +177,7 @@ protocolo_t *recebe_confirmacao(int soquete, unsigned int *last_seq){
 }
 
 void trata_envio(int soquete, unsigned int *sequencia, unsigned int tipo, unsigned char *dados, unsigned int tamanho, unsigned int *last_seq){
-    envia_buffer(soquete, inc_seq(sequencia), tipo, dados, tamanho, last_seq);
+    envia_buffer(soquete, inc_seq(sequencia), tipo, dados, tamanho);
     protocolo_t *pacote = recebe_confirmacao(soquete, last_seq);
     int aceito = pacote->tipo;
     free(pacote);
@@ -186,14 +186,14 @@ void trata_envio(int soquete, unsigned int *sequencia, unsigned int tipo, unsign
             break;
         case NACK:
             while (aceito == NACK){
-                envia_buffer(soquete, *sequencia, tipo, dados, tamanho, last_seq);
+                envia_buffer(soquete, *sequencia, tipo, dados, tamanho);
                 pacote = recebe_confirmacao(soquete, last_seq);
                 aceito = pacote->tipo;
                 free(pacote);
             }
             break;
         case TIMEOUT:
-            envia_buffer(soquete, *sequencia, tipo, dados, tamanho, last_seq);
+            envia_buffer(soquete, *sequencia, tipo, dados, tamanho);
             pacote = recebe_confirmacao(soquete, last_seq);
             aceito = pacote->tipo;
             break;
