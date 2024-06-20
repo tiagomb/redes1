@@ -44,7 +44,7 @@ void lista_videos(int soquete){
 void le_arquivo(int soquete, char *nome){
     FILE *arquivo = fopen(nome, "rb");
     unsigned char *buffer = malloc(TAMANHO);
-    int diff = 0;
+    int diff = 0, aceito = 0;
     protocolo_t *pacote;
     int removidos, lidos = 0;
     for (int i = 0; i < JANELA; i++){
