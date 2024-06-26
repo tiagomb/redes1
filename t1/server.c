@@ -23,7 +23,7 @@
 unsigned int sequencia = 31;
 unsigned int last_seq = 31;
 
-// protocolo_t *janela[JANELA] = { NULL, NULL, NULL, NULL, NULL };
+protocolo_t *janela[JANELA] = { NULL, NULL, NULL, NULL, NULL };
 
 void lista_videos(int soquete){
     DIR* diretorio = opendir("./videos");
@@ -44,16 +44,70 @@ void lista_videos(int soquete){
 void le_arquivo(int soquete, char *nome){
     FILE *arquivo = fopen(nome, "rb");
     unsigned char *buffer = malloc(TAMANHO);
-    int removidos, lidos = 0;
-    while ((lidos = fread(buffer, 1, TAMANHO, arquivo)) > 0){
+    int removidos, lidos = 0, aceito = -1;
+    protocolo_t *confirmacao;
+    for (int i = 0; i < JANELA; i++){
+        lidos = fread(buffer, 1, TAMANHO, arquivo);
         removidos = insere_vlan(buffer);
         fseek(arquivo, -removidos, SEEK_CUR);
-        trata_envio(soquete, &sequencia, DADOS, buffer, lidos, &last_seq);
+        janela[i] = monta_buffer(inc_seq(&sequencia), DADOS, buffer, lidos);
+        send(soquete, janela[i], sizeof(protocolo_t), 0);
         memset(buffer, 0, TAMANHO);
     }
-    fclose(arquivo);
-    trata_envio(soquete, &sequencia, FIM_TRANSMISSAO, NULL, 0, &last_seq);
+    while (lidos > 0){
+        confirmacao = recebe_confirmacao(soquete, &last_seq);
+        sscanf((char *) confirmacao->dados, "%d", &aceito);
+        switch (confirmacao->tipo){
+            case ACK:
+                int diff = aceito - janela[0]->sequencia + 1;
+                for (int i = 0; i < diff; i++){
+                    free(janela[i]);
+                    janela[i] = NULL;
+                }
+                for (int i = 0; i < JANELA - diff; i++){
+                    janela[i] = janela[i + diff];
+                }
+                for (int i = JANELA - diff; i < JANELA; i++){
+                    lidos = fread(buffer, 1, TAMANHO, arquivo);
+                    removidos = insere_vlan(buffer);
+                    fseek(arquivo, -removidos, SEEK_CUR);
+                    janela[i] = monta_buffer(inc_seq(&sequencia), DADOS, buffer, lidos);
+                    send(soquete, janela[i], sizeof(protocolo_t), 0);
+                    memset(buffer, 0, TAMANHO);
+                }
+                break;
+            case NACK:
+                if (aceito == janela[0]->sequencia){
+                    for (int i = 0; i < JANELA; i++){
+                        send(soquete, janela[i], sizeof(protocolo_t), 0);
+                    }
+                }
+                break;
+            case TIMEOUT:
+                for (int i = 0; i < JANELA; i++){
+                    send(soquete, janela[i], sizeof(protocolo_t), 0);
+                }
+                break;
+            default:
+                printf("Erro desconhecido\n");
+                exit(1);
+                break;
+    }
 }
+
+// void le_arquivo(int soquete, char *nome){
+//     FILE *arquivo = fopen(nome, "rb");
+//     unsigned char *buffer = malloc(TAMANHO);
+//     int removidos, lidos = 0;
+//     while ((lidos = fread(buffer, 1, TAMANHO, arquivo)) > 0){
+//         removidos = insere_vlan(buffer);
+//         fseek(arquivo, -removidos, SEEK_CUR);
+//         trata_envio(soquete, &sequencia, DADOS, buffer, lidos, &last_seq);
+//         memset(buffer, 0, TAMANHO);
+//     }
+//     fclose(arquivo);
+//     trata_envio(soquete, &sequencia, FIM_TRANSMISSAO, NULL, 0, &last_seq);
+// }
 
 void manda_video(int soquete, protocolo_t pacote, unsigned char *buffer_sequencia){
     char nome[73] = { 0 };
