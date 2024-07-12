@@ -1,0 +1,5 @@
+- Alterar verificação de NACK e timeout, para que so pare de retransmitir quando receber ACK
+- Ver questão da interface de rede (como generalizar. script talvez?)
+- Verificar possíveis erros/casos não tratados, se está tudo funcionando
+- Verificar se não tem nenhum código burro
+- Fazer relatório
