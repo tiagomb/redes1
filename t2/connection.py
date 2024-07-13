@@ -28,7 +28,7 @@ def receive_packet(config):
             data, addr = sock.recvfrom(1024)
             packet = Packet(*data.decode().split())
             return packet
-            break    print (config)
+            break
     except socket.error as e:
         print(f"Erro ao receber pacote: {e}")
     finally:
