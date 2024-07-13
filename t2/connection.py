@@ -46,5 +46,6 @@ def send_data(config, data, kind, destiny):
     send_packet(packet, config)
 
 def retransmit(packet, config):
+    print (packet.confirmation)
     packet.error = True
     send_packet(packet, config)

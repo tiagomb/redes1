@@ -19,10 +19,11 @@ def main():
         con.send_token(config)
     while True:
         packet = con.receive_packet(config)
-        if packet.destiny == maquina and packet.kind == 'hand':
+        if packet.destiny == maquina:
             packet.confirmation = True
             con.retransmit(packet, config)
-            print(f"Recebeu {packet.data}")
+            if packet.type == 'hand':
+                print(f"Recebeu {packet.data}")
         else:
             con.retransmit(packet, config)
     
