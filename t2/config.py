@@ -3,7 +3,7 @@ def get_config(num):
         lines = f.readlines()
 
     line = lines.index(f"MAQUINA {num}\n")
-    config_lines = lines[line+1:line+4]
+    config_lines = lines[line:line+5]
     config = {}
     for config_line in config_lines:
         key, value = config_line.strip().split()

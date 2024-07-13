@@ -1,9 +1,9 @@
 import random
 
 class Card:
-    def __init__(self, num, init, weight):
+    def __init__(self, num, suit, weight):
         self.num = num
-        self.init = init
+        self.suit = suit
         self.weight = weight
 
     def __repr__(self):
@@ -12,11 +12,9 @@ class Card:
 class Deck:
     nums = ["4", "5", "6", "7", "J", "Q", "K", "A", "2", "3"]
     suits = ["♦", "♠", "♥", "♣"]
-    nums_weights = {num: i*5 for i, num in enumerate(nums)}
-    suits_weights = {suit: i for i, suit in enumerate(suits)}
-
+    nums_weights = {num: i for i, num in enumerate(nums)}
     def __init__(self):
-        self.cards = [Card(num, suit, self.nums_weights[num] + self.suits_weights[suit]) for num in self.nums for suit in self.suits]
+        self.cards = [Card(num, suit, self.nums_weights[num]) for num in self.nums for suit in self.suits]
 
     def shuffle(self):
         random.shuffle(self.cards)
@@ -25,11 +23,12 @@ class Deck:
         shackle = self.cards.pop()
         for card in self.cards:
             if card.weight == shackle.weight+1:
-                card.weight += 100
+                card.weight += self.suits.index(card.suit) + 10
         return shackle
     
     def get_hands(self, num, players):
         return [[self.cards.pop() for _ in range(num)] for _ in range(players)]
+        
 
 class Round:
     def __init__(self, num, players):
@@ -39,6 +38,7 @@ class Round:
         self.hands = self.deck.get_hands(num, players)
         self.winning_card = None
         self.winning_player = None
+        self.plays = 0
 
     def set_card(self, player, card):
         if self.winning_card is None or card.weight > self.winning_card.weight:
@@ -49,3 +49,5 @@ class Round:
         
     def __repr__(self):
         return f"{self.hands} {self.shackle}"
+
+
