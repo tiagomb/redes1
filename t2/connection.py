@@ -28,7 +28,7 @@ def receive_packet(config):
             data, addr = sock.recvfrom(1024)
             packet = Packet(*data.decode().split())
             return packet
-            break
+            break    print (config)
     except socket.error as e:
         print(f"Erro ao receber pacote: {e}")
     finally:
@@ -43,4 +43,8 @@ def send_token(config):
 def send_data(config, data, kind, destiny):
     origin = int(config['MAQUINA'])
     packet = Packet(origin, destiny, data, kind)
+    send_packet(packet, config)
+
+def retransmit(packet, config):
+    packet.error = True
     send_packet(packet, config)

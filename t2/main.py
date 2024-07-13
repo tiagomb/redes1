@@ -21,10 +21,10 @@ def main():
         packet = receive_packet(config)
         if packet.destiny == maquina and packet.kind == 'hand':
             packet.confirmation = True
-            send_data(config, packet.data, packet.kind, packet.destiny)
+            retransmit(packet, config)
             print(f"Recebeu {packet.data}")
         else:
-            send_data(config, packet.data, packet.kind, packet.destiny)
+            retransmit(packet, config)
     
 
 if __name__ == '__main__':
