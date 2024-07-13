@@ -23,8 +23,6 @@
 unsigned int sequencia = 31;
 unsigned int last_seq = 31;
 
-// protocolo_t *janela[JANELA] = { NULL, NULL, NULL, NULL, NULL };
-
 void lista_videos(int soquete){
     DIR* diretorio = opendir("./videos");
     unsigned char nome[TAMANHO] = { 0 };

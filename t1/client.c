@@ -30,41 +30,6 @@
 unsigned int sequencia = 31;
 unsigned int last_seq = 31;
 
-int verifica_sequencias(protocolo_t pacote, unsigned int last_seq){
-	switch (last_seq){
-		case 0:
-			if (pacote.sequencia == 0 || pacote.sequencia == 31 || pacote.sequencia == 30 || pacote.sequencia == 29 || pacote.sequencia == 28){
-				return 1;
-			}
-			return 0;
-			break;
-		case 1:
-			if (pacote.sequencia == 1 || pacote.sequencia == 0 || pacote.sequencia == 31 || pacote.sequencia == 30 || pacote.sequencia == 29){
-				return 1;
-			}
-			return 0;
-			break;
-		case 2:
-			if (pacote.sequencia == 2 || pacote.sequencia == 1 || pacote.sequencia == 0 || pacote.sequencia == 31 || pacote.sequencia == 30){
-				return 1;
-			}
-			return 0;
-			break;
-		case 3:
-			if (pacote.sequencia == 3 || pacote.sequencia == 2 || pacote.sequencia == 1 || pacote.sequencia == 0 || pacote.sequencia == 31){
-				return 1;
-			}
-			return 0;
-			break;
-		default:
-			if (pacote.sequencia >= last_seq - 4 && pacote.sequencia <= last_seq){
-			return 1;
-			}
-			return 0;
-			break;
-	}
-}
-
 void pergunta_videos(int soquete){
 	printf ("Deseja baixar outro vídeo? (s/n): ");
 	char c;

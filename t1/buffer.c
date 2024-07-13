@@ -101,7 +101,7 @@ int buffer_eh_valido(protocolo_t *pacote){
 
 int recebe_msg(int soquete, unsigned char *buffer){
     long long int comeco = timestamp();
-    struct timeval timeout = {30000/1000, (30000%1000)*1000};
+    struct timeval timeout = {5000/1000, (5000%1000)*1000};
     setsockopt(soquete, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     int bytes_recebidos = 0;
     do{
@@ -109,7 +109,7 @@ int recebe_msg(int soquete, unsigned char *buffer){
         if (buffer_eh_valido((protocolo_t*) buffer)){
             return bytes_recebidos;
         }
-    } while (timestamp() - comeco <= 30000);
+    } while (timestamp() - comeco <= 5000);
     return -1;
 }
 
@@ -120,7 +120,7 @@ int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq){
     setsockopt(soquete, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     protocolo_t *pacote_recebido = (protocolo_t*) buffer;
     recv(soquete, buffer, sizeof(protocolo_t), 0);
-    while (pacote_recebido->marcador != 126){
+    while (!buffer_eh_valido(pacote_recebido)){
         recv(soquete, buffer, sizeof(protocolo_t), 0);
     }
     if (calculaCRC(&buffer[1], sizeof(protocolo_t) - 1, tabela_crc) != 0){
@@ -181,27 +181,14 @@ void trata_envio(int soquete, unsigned int *sequencia, unsigned int tipo, unsign
     protocolo_t *pacote = recebe_confirmacao(soquete, last_seq);
     int aceito = pacote->tipo;
     free(pacote);
-    switch (aceito){
-        case ACK:
-            break;
-        case NACK:
-            while (aceito == NACK){
-                envia_buffer(soquete, *sequencia, tipo, dados, tamanho);
-                pacote = recebe_confirmacao(soquete, last_seq);
-                aceito = pacote->tipo;
-                free(pacote);
-            }
-            break;
-        case TIMEOUT:
-            envia_buffer(soquete, *sequencia, tipo, dados, tamanho);
-            pacote = recebe_confirmacao(soquete, last_seq);
-            aceito = pacote->tipo;
-            break;
-        case ERRO:
+    while (aceito != ACK){
+        if (aceito == ERRO){
             fprintf(stderr, "Erro desconhecido\n");
             exit(1);
-            break;
-        default:
-            break;
+        }
+        envia_buffer(soquete, *sequencia, tipo, dados, tamanho);
+        pacote = recebe_confirmacao(soquete, last_seq);
+        aceito = pacote->tipo;
+        free(pacote);
     }
 }
