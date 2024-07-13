@@ -20,11 +20,12 @@ def main():
     while True:
         packet = con.receive_packet(config)
         if packet.destiny == maquina:
+            print ("Entrei\n")
             packet.confirmation = True
             con.retransmit(packet, config)
-            if packet.type == 'hand':
+            if packet.kind == 'hand':
                 print(f"Recebeu {packet.data}")
-        else:
+        elif packet.origin != maquina:
             con.retransmit(packet, config)
     
 

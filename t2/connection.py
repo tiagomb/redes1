@@ -1,4 +1,5 @@
 import socket
+import pickle
 
 class Packet:
     def __init__(self, origin, destiny, data, kind):
@@ -14,7 +15,7 @@ class Packet:
 def send_packet(packet, config):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        sock.sendto(str(packet).encode(), (config['IP_ENVIO'], int(config['PORTA_ENVIO'])))
+        sock.sendto(pickle.dumps(packet), (config['IP_ENVIO'], int(config['PORTA_ENVIO'])))
     except socket.error as e:
         print(f"Erro ao enviar pacote: {e}")
     finally:
@@ -26,7 +27,7 @@ def receive_packet(config):
         sock.bind((config['IP'], int(config['PORTA_RECIBO'])))
         while True:
             data, addr = sock.recvfrom(1024)
-            packet = Packet(*data.decode().split())
+            packet = pickle.loads(data)
             return packet
             break
     except socket.error as e:
