@@ -26,7 +26,7 @@ def receive_packet(config):
         sock.bind((config['IP'], int(config['PORTA_RECIBO'])))
         while True:
             data, addr = sock.recvfrom(1024)
-            packet = data.decode()
+            packet = Packet(*data.decode().split())
             return packet
             break
     except socket.error as e:
