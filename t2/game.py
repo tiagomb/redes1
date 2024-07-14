@@ -61,8 +61,7 @@ class Round:
         if self.winning_card is None or card.weight > self.winning_card.weight:
             self.winning_card = card
             self.winning_player = player
-        self.hands[player].remove(card)
-        return self.winning_player
+
         
     def __repr__(self):
         return f"{self.hands} {self.shackle}"

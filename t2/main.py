@@ -2,10 +2,13 @@ from game import Deck, Round, Player, Hand
 import config as cfg
 import connection as con
 
-def play_hand(jogador, config, maquina):
-    while jogador.rodadas:
+def play_hand(jogador, config, maquina, rodada):
+    while jogador.rounds:
         packet = con.receive_packet(config)
         if packet.origin != maquina and packet.kind != 'token':
+            if packet.kind == 'bet':
+                jogador.bet_sum += packet.data
+                jogador.bet_quantity+=1
             con.retransmit(packet, config)
         elif packet.origin == maquina:
             con.send_token(config)
@@ -21,7 +24,10 @@ def play_hand(jogador, config, maquina):
                     jogador.bet_sum += jogador.bet
                     jogador.bet_quantity += 1
                 con.send_data(config, jogador.bet, 'bet', (maquina + 3) % 4)
-            print (jogador.bet_sum) 
+            else:
+                play = int(input("Selecione a carta que deseja jogar: "))
+                rodada.set_card(maquina, jogador.hand[play])
+
 
 def main():
     maquina = int(input("Digite o número da máquina(0 a 3): "))
@@ -45,6 +51,8 @@ def main():
     while jogador.alives > 1:
         if maquina == mao.dealer:
             con.send_data(config, mao.shackle, 'shackle', (maquina + 3) % 4)
+            jogador.hand = mao.hands[maquina]
+            jogador.rounds = len(jogador.hand)
             packet = con.receive_packet(config)
             if packet.origin == maquina and packet.confirmation == True:
                 for i in range(4):
@@ -52,25 +60,25 @@ def main():
                         con.send_data(config, mao.hands[i], 'hand', i)
                         packet = con.receive_packet(config)
                         if packet.origin == maquina and packet.confirmation == True:
-                            print(f"Recebeu")
             con.send_token(config)
-            play_hand(jogador, config, maquina)
+            play_hand(jogador, config, maquina, rodada)
         packet = con.receive_packet(config)
-        if packet.origin != maquina and packet.kind != 'token':
-            if packet.kind == 'hand':
-                if packet.destiny != maquina:
-                    con.retransmit(packet, config)
-                else:
-                    packet.confirmation = True
-                    jogador.hand = packet.data
-                    jogador.rodadas = len(jogador.hand)
-                    con.retransmit(packet, config)
-                    play_hand(jogador, config, maquina)            
-            elif packet.kind == 'shackle':
-                jogador.shackle = packet.data
-                if packet.destiny == maquina:
-                    packet.confirmation = True
+        if packet.kind == 'hand':
+            if packet.destiny != maquina:
                 con.retransmit(packet, config)
+            else:
+                packet.confirmation = True
+                jogador.hand = packet.data
+                jogador.rounds = len(jogador.hand)
+                con.retransmit(packet, config)
+                play_hand(jogador, config, maquina, rodada)            
+        else:
+            jogador.shackle = packet.data
+            if packet.destiny == maquina:
+                packet.confirmation = True
+            con.retransmit(packet, config)
+        print(packet.kind)
+        print(packet.data)
 
 
     # while True:
