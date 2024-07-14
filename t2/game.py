@@ -31,25 +31,27 @@ class Deck:
 
 
 
-class Player:
+class Game:
     def __init__(self):
+        self.alives = [0, 1, 2, 3]
+        self.handSize = 1
         self.lifes = 7
-        self.points = 0
-        self.bet = None
-        self.hand = []
-        self.shackle = None
-        self.alives = 4
-        self.bet_quantity = 0
-        self.bet_sum = 0
-        self.rounds = 0
-        
+
 class Hand:
-    def __init__(self, num, players, dealer):
+    def __init__(self):
+        self.points = 0
+        self.cards = []
+        self.shackle = None
+        self.bet = None
+        self.bet_sum = 0
+        self.bet_quantity = 0
+        
+class Deal:
+    def __init__(self, num, players):
         self.deck = Deck()
         self.deck.shuffle()
         self.shackle = self.deck.get_shackle()
         self.hands = self.deck.get_hands(num ,players)
-        self.dealer = dealer
 
 class Round:
     def __init__(self):
