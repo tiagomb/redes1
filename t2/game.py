@@ -22,7 +22,7 @@ class Deck:
     def get_shackle(self):
         shackle = self.cards.pop()
         for card in self.cards:
-            if card.weight == shackle.weight+1:
+            if card.weight == (shackle.weight+1) % 10:
                 card.weight += self.suits.index(card.suit) + 10
         return shackle
     

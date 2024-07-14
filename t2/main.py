@@ -68,12 +68,12 @@ import connection as con
 #         print(packet.data)
 
 def distribute_hands(maquina, config, carteador, vivos):
-    for i in vivos:
-        if i != maquina:
-            con.send_data(config, carteador.hands[i], 'hand', i)
-            packet = con.receive_packet(config)
-            if packet.origin == maquina and packet.confirmation == True:
-                print ("recebeu mão")
+    index = vivos.index(maquina)
+    for i in range(index+1, index+len(vivos)):
+        con.send_data(config, carteador.hands[i%len(vivos)], 'hand', vivos[i%len(vivos)])
+        packet = con.receive_packet(config)
+        if packet.origin == maquina and packet.confirmation == True:
+            print ("recebeu mão")
 
 def reset_hand(mao):
     mao.points = 0
@@ -140,7 +140,8 @@ def main():
             con.retransmit(packet, config)
         elif packet.origin == maquina:
             if packet.kind == 'shackle':
-                distribute_hands(maquina, config, mao)
+                distribute_hands(maquina, config, carteador, jogo.alives)
+                con.send_token(config)
             elif packet.kind == 'update':
                 jogo.alives = packet.data[0]
                 if len(jogo.alives) > 1:
@@ -148,14 +149,17 @@ def main():
                         carteador = Deal(jogo.handSize, len(jogo.alives))
                     else:
                         carteador = Deal(jogo.handSize+1, len(jogo.alives))
+                    mao.shackle = carteador.shackle
+                    print ("Shackle: ", mao.shackle)
                     con.send_data(config, mao.shackle, 'shackle', (maquina + 3) % 4)
                     mao.cards = carteador.hands[maquina]
-                    jogo.handSize = mao.handSize
-                    distribute_hands(maquina, config, mao, jogo.alives)
-            con.send_token(config)
+                    print ("Cartas: ", mao.cards)
+                    jogo.handSize = len(mao.cards)
+            else:
+                con.send_token(config)
         else:
             if mao.bet == None:
-                if mao.bet_quantity == mao.alives - 1:
+                if mao.bet_quantity == len(jogo.alives) - 1:
                     mao.bet = int(input("Digite a aposta: "))
                     while (mao.bet + mao.bet_sum == len(mao.cards)):
                         mao.bet = int(input("A soma das apostas não pode ser igual ao número de cartas, escolha novamente: "))
@@ -166,21 +170,25 @@ def main():
                     mao.bet_quantity += 1
                 con.send_data(config, mao.bet, 'bet', (maquina + 3) % 4)
             elif len(mao.cards) > 0:
-                if rodada.plays != jogo.alives:
+                if rodada.plays != len(jogo.alives):
                     play = int(input("Selecione a carta que deseja jogar: "))
-                    con.send_data(config, jogador.hand[play], 'card', (maquina + 3) % 4)
-                    rodada.set_card(maquina, mao.cards[play])
+                    card = mao.cards.pop(play)
+                    con.send_data(config, card, 'play', (maquina + 3) % 4)
+                    rodada.set_card(maquina, card)
                     rodada.plays += 1
                 else:
                     if rodada.winning_player == maquina:
                         mao.points += 1
                     rodada.plays = 0
+                    print("Vencedor da rodada: ", rodada.winning_player)
                     con.send_data(config, rodada.winning_player, 'win', (maquina + 3) % 4)
             else:
                 if rodada.winning_player == maquina:
                     mao.points += 1
                 rodada.plays = 0
+                print ("Vencedor da rodada: ", rodada.winning_player)
                 jogo.lifes -= abs(mao.bet - mao.points)
+                print ("Vidas: ", jogo.lifes)
                 reset_hand(mao)
                 if jogo.lifes == 0:
                     jogo.alives.remove(maquina)
