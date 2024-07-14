@@ -6,7 +6,7 @@ def play_hand(jogador, config, maquina):
     while jogador.rodadas:
         packet = con.receive_packet(config)
         if packet.origin != maquina and packet.kind != 'token':
-            retransmit(packet, config)
+            con.retransmit(packet, config)
         elif packet.origin == maquina:
             con.send_token(config)
         else:
