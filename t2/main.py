@@ -1,4 +1,4 @@
-from game import Deck, Round
+from game import Deck, Round, Player, Hand
 import config as cfg
 import connection as con
 
@@ -20,33 +20,36 @@ def main():
                 if packet.origin == 0 and packet.confirmation == True:
                     print(f"Recebeu")
         con.send_token(config)
-    while jogador.vivos > 1:
+    while jogador.alives > 1:
         packet = con.receive_packet(config)
         if packet.origin != maquina and packet.kind != 'token':
-            if packet.kind == 'hand' and packet.destiny == maquina:
-                packet.confirmation = True
-                jogador.hand = packet.data
-                jogador.rodadas = len(jogador.hand)
-                con.retransmit(packet, config)
-                while jogador.rodadas:
-                    packet = con.receive_packet(config)
-                    if packet.origin != maquina and packet.kind != 'token':
-                        retransmit(packet, config)
-                    elif packet.origin == maquina:
-                        con.send_token(config)
-                    else:
-                        if jogador.bet = None:
-                            if jogador.bet_quantity == 3:
-                                jogador.bet = int(input("Digite a aposta: "))
-                                while (jogador.bet + jogador.bet_sum == len(jogador.hand)):
-                                    jogador.bet = int(input("A soma das apostas não pode ser igual ao número de cartas, escolha novamente: "))
-                                jogador.bet_sum += jogador.bet
-                            else:
-                                jogador.bet = int(input("Digite a aposta: "))
-                                jogador.bet_sum += jogador.bet
-                                jogador.bet_quantity += 1
-                            con.send_data(config, jogador.bet, 'bet', (maquina + 3) % 4)
-                        print (jogador.bet_sum)             
+            if packet.kind == 'hand':
+                if packet.destiny != maquina:
+                    con.retransmit(packet, config)
+                else:
+                    packet.confirmation = True
+                    jogador.hand = packet.data
+                    jogador.rodadas = len(jogador.hand)
+                    con.retransmit(packet, config)
+                    while jogador.rodadas:
+                        packet = con.receive_packet(config)
+                        if packet.origin != maquina and packet.kind != 'token':
+                            retransmit(packet, config)
+                        elif packet.origin == maquina:
+                            con.send_token(config)
+                        else:
+                            if jogador.bet == None:
+                                if jogador.bet_quantity == 3:
+                                    jogador.bet = int(input("Digite a aposta: "))
+                                    while (jogador.bet + jogador.bet_sum == len(jogador.hand)):
+                                        jogador.bet = int(input("A soma das apostas não pode ser igual ao número de cartas, escolha novamente: "))
+                                    jogador.bet_sum += jogador.bet
+                                else:
+                                    jogador.bet = int(input("Digite a aposta: "))
+                                    jogador.bet_sum += jogador.bet
+                                    jogador.bet_quantity += 1
+                                con.send_data(config, jogador.bet, 'bet', (maquina + 3) % 4)
+                            print (jogador.bet_sum)             
             elif packet.kind == 'shackle':
                 jogador.shackle = packet.data
                 if packet.destiny == maquina:

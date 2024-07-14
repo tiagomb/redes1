@@ -38,7 +38,7 @@ def receive_packet(config):
 def send_token(config):
     origin = int(config['MAQUINA'])
     destiny = (origin + 1) % 4
-    packet = Packet(origin, destiny, None, 'token')
+    packet = Packet(origin, destiny, 'token', 'token')
     send_packet(packet, config)
 
 def send_data(config, data, kind, destiny):
@@ -47,6 +47,5 @@ def send_data(config, data, kind, destiny):
     send_packet(packet, config)
 
 def retransmit(packet, config):
-    print (packet.confirmation)
     packet.error = True
     send_packet(packet, config)
