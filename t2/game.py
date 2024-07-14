@@ -44,11 +44,12 @@ class Player:
         self.rounds = 0
         
 class Hand:
-    def __init__(self, num, players):
+    def __init__(self, num, players, dealer):
         self.deck = Deck()
         self.deck.shuffle()
         self.shackle = self.deck.get_shackle()
         self.hands = self.deck.get_hands(num ,players)
+        self.dealer = dealer
 
 class Round:
     def __init__(self):
