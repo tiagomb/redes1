@@ -28,14 +28,30 @@ class Deck:
     
     def get_hands(self, num, players):
         return [[self.cards.pop() for _ in range(num)] for _ in range(players)]
-        
 
-class Round:
+
+
+class Player:
+    def __init__(self):
+        self.lifes = 7
+        self.points = 0
+        self.bet = None
+        self.hand = []
+        self.shackle = None
+        self.alives = 4
+        self.bet_quantity = 0
+        self.bet_sum = 0
+        self.rounds = 0
+        
+class Hand:
     def __init__(self, num, players):
         self.deck = Deck()
         self.deck.shuffle()
         self.shackle = self.deck.get_shackle()
-        self.hands = self.deck.get_hands(num, players)
+        self.hands = self.deck.get_hands(num ,players)
+
+class Round:
+    def __init__(self):
         self.winning_card = None
         self.winning_player = None
         self.plays = 0
