@@ -1,4 +1,5 @@
 import random
+import connection as con
 
 class Card:
     def __init__(self, num, suit, weight):
@@ -67,7 +68,7 @@ class Hand:
 
     def update_bets(self, bet):
         self.bet_quantity += 1
-        self.bet_sum += 
+        self.bet_sum += bet 
         print ("Apostas até agora: ", self.bet_sum)
 
     def update_cards(self, hand, game):
@@ -81,7 +82,7 @@ class Hand:
 
     def place_bet(self, bet, alives):
         self.bet = int(input("Digite a aposta: "))
-        if self.bet_quantity == len(alives) - 1:
+        if self.bet_quantity == alives - 1:
             while (self.bet + self.bet_sum == len(self.cards)):
                 self.bet = int(input("A soma das apostas não pode ser igual ao número de cartas, escolha novamente: "))
         self.bet_sum += self.bet
@@ -116,7 +117,7 @@ class Round:
         print ("Carta jogada: ", card)
 
     def check_winner(self, winner, hand, machine):
-        if winner = machine:
+        if winner == machine:
             hand.points += 1
         print ("Vencedor da rodada: ", winner)
         self.plays = 0
