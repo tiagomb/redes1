@@ -48,6 +48,8 @@ void toca_video(int soquete, char *caminho){
 	char *comando = (char*) malloc(strlen(caminho) + 10);
 	snprintf(comando, strlen(caminho) + 10, "xdg-open %s", caminho);
 	system(comando);
+	free (caminho);
+	free (comando);
 	pergunta_videos(soquete);
 }
 
@@ -79,6 +81,7 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome, unsigned char 
 				} else if (pacote.tipo == FIM_TRANSMISSAO){
 					envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
 					fclose(arquivo);
+					free(buffer);
 					toca_video(soquete, caminho);
 				}
 				break;
