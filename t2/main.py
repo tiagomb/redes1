@@ -1,11 +1,11 @@
-from game import Deck, Round, Game, Hand, Deal
+from game import Deck, Turn, Game, Hand, Dealer
 import config as cfg
 import connection as con
 
 def main():
     maquina = int(input("Digite o número da máquina(0 a 3): "))
     config = cfg.get_config(maquina)
-    rodada = Round()
+    rodada = Turn()
     jogo = Game()
     mao = Hand()
     if maquina == 0:
@@ -34,40 +34,62 @@ def main():
             elif packet.kind == 'update':
                 jogo.end_round(mao, rodada, maquina, packet.data[1], packet.data[0])
                 packet.data[0] = jogo.alives
+            elif packet.kind == 'error':
+                print ("Erro: ", packet.data)
+                con.retransmit(packet, config)
+                exit(1)
             if packet.destiny == maquina:
                 packet.confirmation = True
             con.retransmit(packet, config)
         elif packet.origin == maquina: # Case where you received your own packet and have the token, usually you just pass the token
+            if packet.confirmation == False:
+                print ("Erro: Destino não está na rede")
+                con.send_data(config, 'Destino não está na rede', 'error', (maquina+3)%4)
+                exit(1)
             if packet.kind == 'shackle': # If you have the token and received a shackle, it means you are the dealer and need to distribute the hands
                 carteador.distribute_hands(maquina, config, jogo.alives)
                 con.send_token(config)
             elif packet.kind == 'update': #Means the hand is over and you need to become the new dealer
                 jogo.alives = packet.data[0]
-                if len(jogo.alives) > 1:
-                    if jogo.handSize == 7:
-                        carteador = Deal(jogo.handSize, len(jogo.alives))
-                    else:
-                        carteador = Deal(jogo.handSize+1, len(jogo.alives))
+                if maquina == mao.dealer:
+                    carteador = Deal(jogo.handSize+1, len(jogo.alives))
                     mao.update_shackle(carteador.shackle)
                     con.send_data(config, mao.shackle, 'shackle', (maquina + 3) % 4)
                     mao.update_cards(carteador.hands[maquina], jogo)
+                else:
+                    con.send_token(config)
             else:
                 con.send_token(config)
         else: # Case where you just received the token and hasn't sent any packet yet
-            if mao.bet == None: # If you haven't bet yet, you need to bet
-                mao.place_bet(mao.bet, len(jogo.alives))
-                con.send_data(config, mao.bet, 'bet', (maquina + 3) % 4)
-            elif len(mao.cards) > 0: # If you have cards, you need to play
-                if rodada.plays != len(jogo.alives): # If it's not the last play of the round, you need to play
+            if mao.bet == None: 
+                if len(mao.cards) > 0: # If you haven't bet and have cards, you need to bet
+                    mao.place_bet(mao.bet, len(jogo.alives))
+                    con.send_data(config, mao.bet, 'bet', (maquina + 3) % 4)
+                elif maquina == mao.dealer: # You have no cards and no bet, so either you are the dealer or you are waiting for the dealer to distribute the cards
+                    carteador = Deal(jogo.handSize+1, len(jogo.alives))
+                    mao.update_shackle(carteador.shackle)
+                    con.send_data(config, mao.shackle, 'shackle', (maquina + 3) % 4)
+                    mao.update_cards(carteador.hands[maquina], jogo)
+                else:
+                    con.send_token(config)
+            elif len(mao.cards) > 0: 
+                if len(rodada.plays) == 0: # If nobody played on this turn, you must be the previous turn winner to start
+                    if maquina == rodada.starter:
+                        card = rodada.play_card(mao.cards)
+                        con.send_data(config, card, 'play', (maquina + 3) % 4)
+                        rodada.set_card(maquina, card)
+                    else:
+                        con.send_token(config)
+                if rodada.plays != len(jogo.alives): # Means you didn't play this turn, so you need to play
                     card = rodada.play_card(mao.cards)
                     con.send_data(config, card, 'play', (maquina + 3) % 4)
                     rodada.set_card(maquina, card)
                 else: # Everybody played, you need to check the winner
-                    rodada.check_winner(rodada.winning_player, mao, maquina)
-                    con.send_data(config, rodada.winning_player, 'win', (maquina + 3) % 4)
+                    rodada.check_winner(rodada.winning, mao, maquina)
+                    con.send_data(config, rodada.winning, 'win', (maquina + 3) % 4)
             else: # If you don't have cards, the hand is over and you need to update the game
-                jogo.end_round(mao, rodada, maquina, rodada.winning_player, jogo.alives)
-                con.send_data(config, [jogo.alives, rodada.winning_player], 'update', (maquina + 3) % 4)
+                jogo.end_round(mao, rodada, maquina, rodada.winning, jogo.alives)
+                con.send_data(config, [jogo.alives, rodada.winning], 'update', (maquina + 3) % 4)
     if jogo.lifes == 0:
         print("Você perdeu!")
     else:
