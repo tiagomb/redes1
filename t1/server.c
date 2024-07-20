@@ -50,6 +50,7 @@ void le_arquivo(int soquete, char *nome){
         memset(buffer, 0, TAMANHO);
     }
     fclose(arquivo);
+    free(buffer);
     trata_envio(soquete, &sequencia, FIM_TRANSMISSAO, NULL, 0, &last_seq);
 }
 
@@ -79,6 +80,7 @@ void manda_video(int soquete, protocolo_t pacote, unsigned char *buffer_sequenci
     envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
     snprintf((char *) buffer, TAMANHO, "%ld %ld", info.st_size/1000000, info.st_ctime);
     trata_envio(soquete, &sequencia, DESCRITOR, buffer, strlen((char *) buffer), &last_seq);
+    free(buffer);
     le_arquivo(soquete, nome);
 }
 
