@@ -11,7 +11,7 @@ class Card:
         return f"{self.num} {self.suit}"
 
 class Deck:
-    nums = ["4", "5", "6", "7", "J", "Q", "K", "A", "2", "3"]
+    nums = ["4", "5", "6", "7", "Q", "J", "K", "A", "2", "3"]
     suits = ["♦", "♠", "♥", "♣"]
     nums_weights = {num: i for i, num in enumerate(nums)}
     def __init__(self):
@@ -44,13 +44,14 @@ class Game:
             hand.points += 1
         turn.plays = []
         turn.winning = None
+        print ("Vencedor da rodada: ", winner)
         self.lifes -= abs(hand.bet - hand.points)
         self.alives = alives
         hand.end()
         turn.starter = (hand.dealer + 1) % 4
-        if self.lifes == 0:
+        if self.lifes <= 0:
             self.alives.remove(machine)
-        print ("Vidas: ", self.message[:lifes])
+        print ("Vidas: ", self.message[:self.lifes])
 
 class Hand:
     def __init__(self):
@@ -117,30 +118,30 @@ class Turn:
         self.plays = []
 
     def set_card(self, player, card):
-        for play in plays:
+        for play in self.plays:
             if card.weight == play[0].weight:
                 card.weight = play[0].weight = -1
-        self.plays.append((card, player))
-        self.plays.sort(key = lambda play: play[0].weight, reverse = True)
-        self.winning = plays[0][1] if plays[0][0].weight != -1 else None
+        self.plays.append([card, player])
+        self.winning = max(self.plays, key= lambda play: play[0].weight)
+        self.winning = self.winning[1] if self.winning[0].weight != -1 else None
+
 
     def check_winner(self, winner, hand, machine):
         if winner == machine:
             hand.points += 1
-        self.starter = winner
+        self.starter = winner if winner != None else self.starter
         print ("Vencedor da rodada: ", winner)
         self.plays = []
         self.winning = None
 
     def play_card(self, cards):
         print ("Cartas jogadas até agora: ")
-        for play in plays:
+        for play in self.plays:
             print (f"Jogador {play[1]} jogou {play[0]}")
         print ("Suas cartas: ")
         for i, card in enumerate(cards):
             print (f"{i} - {card}")
         card = int(input("Digite o número da carta que deseja jogar: "))
         return cards.pop(card)
-
         
 
