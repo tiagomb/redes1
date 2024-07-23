@@ -1,5 +1,6 @@
 import random
 import connection as con
+import os
 
 class Card:
     def __init__(self, num, suit, weight):
@@ -39,19 +40,27 @@ class Game:
         self.lifes = 7
         self.message = 'FODA-SE'
 
-    def end_hand(self, hand, turn, machine, winner, alives):
+    def check_alives(self, alives, winner, hand, machine):
+        os.system('clear')
+        print ("Vencedor da rodada: ", winner)
         if winner == machine:
             hand.points += 1
+        self.alives = alives
+        self.lifes -= abs(hand.bet - hand.points)
+        if self.lifes <= 0:
+            print ("Você perdeu!")
+            self.alives.remove(machine)
+
+    def end_hand(self, hand, turn, alives):
+        self.alives = alives
         turn.plays = []
         turn.winning = None
-        print ("Vencedor da rodada: ", winner)
-        self.lifes -= abs(hand.bet - hand.points)
-        self.alives = alives
-        hand.end()
-        turn.starter = (hand.dealer + 1) % 4
-        if self.lifes <= 0:
-            self.alives.remove(machine)
+        hand.end(self)
+        turn.starter = self.alives[(self.alives.index(hand.dealer)+1) % len(self.alives)]
         print ("Vidas: ", self.message[:self.lifes])
+
+    def is_over(self):
+        return len(self.alives) == 1
 
 class Hand:
     def __init__(self):
@@ -61,16 +70,19 @@ class Hand:
         self.bet = None
         self.bet_sum = 0
         self.bet_quantity = 0
+        self.dealerIndex = 0
         self.dealer = 0
 
-    def end(self):
+    def end(self, jogo):
         self.points = 0
         self.cards = []
         self.shackle = None
         self.bet = None
         self.bet_sum = 0
         self.bet_quantity = 0
-        self.dealer = 3 if self.dealer == 0 else self.dealer - 1
+        self.dealerIndex = len(jogo.alives) - 1 if self.dealerIndex == 0 else self.dealerIndex - 1
+        self.dealer = jogo.alives[self.dealerIndex]
+        
 
     def update_bets(self, bet):
         self.bet_quantity += 1
@@ -127,6 +139,7 @@ class Turn:
 
 
     def check_winner(self, winner, hand, machine):
+        os.system('clear')
         if winner == machine:
             hand.points += 1
         self.starter = winner if winner != None else self.starter
@@ -134,7 +147,8 @@ class Turn:
         self.plays = []
         self.winning = None
 
-    def play_card(self, cards):
+    def play_card(self, cards, hand):
+        print ("Manilha: ", hand.shackle)
         print ("Cartas jogadas até agora: ")
         for play in self.plays:
             print (f"Jogador {play[1]} jogou {play[0]}")
