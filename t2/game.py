@@ -57,7 +57,8 @@ class Game:
         turn.winning = None
         hand.end(self)
         turn.starter = self.alives[(self.alives.index(hand.dealer)+1) % len(self.alives)]
-        print ("Vidas: ", self.message[:self.lifes])
+        if self.lifes > 0:
+            print ("Vidas: ", self.message[:self.lifes])
 
     def is_over(self):
         return len(self.alives) == 1
@@ -70,7 +71,6 @@ class Hand:
         self.bet = None
         self.bet_sum = 0
         self.bet_quantity = 0
-        self.dealerIndex = 0
         self.dealer = 0
 
     def end(self, jogo):
@@ -80,8 +80,12 @@ class Hand:
         self.bet = None
         self.bet_sum = 0
         self.bet_quantity = 0
-        self.dealerIndex = len(jogo.alives) - 1 if self.dealerIndex == 0 else self.dealerIndex - 1
-        self.dealer = jogo.alives[self.dealerIndex]
+        x = 3 if self.dealer == 0 else self.dealer - 1
+        while x not in jogo.alives:
+            x -= 1
+            if x == -1:
+                x = 3
+        self.dealer = x
         
 
     def update_bets(self, bet):

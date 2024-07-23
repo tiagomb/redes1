@@ -20,6 +20,8 @@ def main():
             if packet.origin == maquina:
                 con.send_token(config)
             else:
+                if packet.kind == 'update':
+                    jogo.alives = packet.data
                 if packet.destiny == maquina:
                     packet.confirmation = True
                 con.retransmit(packet, config)
