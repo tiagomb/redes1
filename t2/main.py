@@ -1,111 +1,120 @@
-from game import Deck, Turn, Game, Hand, Dealer
 import config as cfg
 import connection as con
-import copy
+from game import Dealer
+import os
+
+def check_packet_player(packet, machine, cards, lifes, size, dealer):
+    if packet.kind == 'hand':
+        cartas = packet.data
+        print ("Suas cartas: ", packet.data)
+    elif packet.kind == 'shackle':
+        print ("Manilha: ", packet.data)
+    elif packet.kind == 'bet':
+        jogadas = int(input("Quantos pontos você faz?"))
+        packet.data[machine] = jogadas
+    elif packet.kind == 'show':
+        print ("Apostas: ")
+        for i, aposta in enumerate(packet.data):
+            print(f"Jogador {i} apostou que faz {aposta} pontos")
+    elif packet.kind == 'play':
+        for play in packet.data:
+            print (f"Jogador {play[0]} jogou {play[1]}")
+        print ("Suas cartas: ")
+        for i, card in enumerate(cards):
+            print (f"{i} - {card}")
+        num = int(input("Digite o número da carta que deseja jogar: "))
+        card = cartas.pop(num)
+        packet.data.append([machine, card])
+    elif packet.kind == 'winner':
+        print ("Vencedor da rodada: ", packet.data)
+    elif packet.kind == 'update':
+        lifes = packet.data
+        if size < 13:
+            size+=1
+    elif packet.kind == 'token':
+        dealer = Dealer(size, lifes)
+        print ("Suas cartas: ", dealer.hands[0])
+        dealer.distribute_hands(0, config)
+        print ("Manilha: ", dealer.shackle)
+        con.send_data(config, dealer.shackle, 'shackle')
+    else:
+        print("Erro: ", packet.data)
+        con.send_packet(packet, config)
+        exit(1)
+    if packet.destiny == machine:
+        packet.confirmation = True
+    con.send_packet(packet, config)
+
+def check_packet_dealer(packet, machine, cards, lifes, size, dealer):
+    if packet.confirmation == False:
+        con.send_data(config, 'erro', 'error')
+        exit(1)
+    if packet.kind == 'shackle:
+        jogadas = int(input("Quantos pontos você faz?"))
+        dealer.bets[machine] = jogadas
+        con.send_data(config, dealer.bets, 'bet')
+    elif packet.kind == 'bet':
+        dealer.bets = packet.data
+        print ("Apostas: ")
+        for i, aposta in enumerate(packet.data):
+            print(f"Jogador {i} apostou que faz {aposta} pontos")
+        con.send_data(config, dealer.bets, 'bet')
+    elif packet.kind == 'show':
+        print ("Suas cartas: ")
+        for i, card in enumerate(cards):
+            print (f"{i} - {card}")
+        num = int(input("Digite o número da carta que deseja jogar: "))
+        card = cartas.pop(num)
+        dealer.plays.append([machine, card])
+        con.send_data(config, dealer.plays, 'play')
+    elif packet.kind == 'play':
+        carteador.check_winner()
+        print ("Vencedor da rodada: ", carteador.winner)
+        con.send_data(config, carteador.winner, 'winner')
+    elif packet.kind == 'winner':
+        if len(cards) > 0:
+            dealer.plays = []
+            print ("Suas cartas: ")
+            for i, card in enumerate(cards):
+                print (f"{i} - {card}")
+            num = int(input("Digite o número da carta que deseja jogar: "))
+            card = cartas.pop(num)
+            dealer.plays.append([machine, card])
+            con.send_data(config, dealer.plays, 'play')
+        else:
+            carteador.update_lifes()
+            lifes = dealer.lifes
+            alives = sum(x>0 for x in lifes)
+            if size < 13:
+                size+=1
+            con.send_data(config, dealer.lifes, 'update')
+    else:
+        con.send_token()
 
 def main():
-    maquina = int(input("Digite o número da máquina(0 a 3): "))
-    config = cfg.get_config(maquina)
-    rodada = Turn()
-    jogo = Game()
-    mao = Hand()
-    if maquina == 0:
-        carteador = Dealer(1, 4)
-        con.send_data(config, carteador.shackle, 'shackle', (maquina + 3) % 4)
-        mao.update_shackle(carteador.shackle)
-        mao.update_cards(carteador.hands[maquina], jogo)
-    while not jogo.is_over():
+    machine = int(input("Digite o número da máquina(0 a 3): "))
+    config = cfg.get_config(machine)
+    cards = []
+    lifes = [7, 7, 7, 7]
+    alives = sum(x>0 for x in lifes)
+    dealer = None
+    size = 1
+    if machine == 0:
+        dealer = Dealer(1, lifes)
+        print ("Suas cartas: ", dealer.hands[0])
+        dealer.distribute_hands(0, config)
+        print ("Manilha: ", dealer.shackle)
+        con.send_data(config, dealer.shackle, 'shackle')
+    while alives > 0:
         packet = con.receive_packet(config)
-        if jogo.lifes <= 0:
-            if packet.origin == maquina:
-                con.send_token(config)
-            else:
-                if packet.kind == 'update':
-                    jogo.alives = packet.data
-                if packet.destiny == maquina:
-                    packet.confirmation = True
-                con.retransmit(packet, config)
-        elif packet.origin != maquina and packet.kind != 'token': # Case where you update and sync your info and retransmit the packet
-            if packet.kind == 'shackle':
-                mao.update_shackle(packet.data)
-            elif packet.kind == 'hand':
-                if packet.destiny == maquina:
-                    mao.update_cards(packet.data, jogo)
-            elif packet.kind == 'bet':
-                mao.update_bets(packet.data)
-            elif packet.kind == 'play':
-                card = copy.deepcopy(packet.data)
-                rodada.set_card(packet.origin, card)
-            elif packet.kind == 'win':
-                rodada.check_winner(packet.data, mao, maquina)
-            elif packet.kind == 'check':
-                jogo.check_alives(packet.data[0], packet.data[1], mao, maquina)
-                packet.data[0] = jogo.alives
-            elif packet.kind == 'update':
-                jogo.end_hand(mao, rodada, packet.data)
-            elif packet.kind == 'error':
-                print ("Erro: ", packet.data)
-                con.retransmit(packet, config)
-                exit(1)
-            if packet.destiny == maquina:
+        if lifes[machine] == 0:
+            if packet.kind == 'update':
+                lifes = packet.data
+                alives = sum(x>0 for x in lifes)
+            if packet.destiny == machine:
                 packet.confirmation = True
-            con.retransmit(packet, config)
-        elif packet.origin == maquina: # Case where you received your own packet and have the token, usually you just pass the token
-            if packet.confirmation == False:
-                print ("Erro: Destino não está na rede")
-                con.send_data(config, 'Destino não está na rede', 'error', (maquina+3)%4)
-                exit(1)
-            if packet.kind == 'shackle': # If you have the token and received a shackle, it means you are the dealer and need to distribute the hands
-                carteador.distribute_hands(maquina, config, jogo.alives)
-                con.send_token(config)
-            elif packet.kind == 'check': # Means you checked everyone, now you need to update them
-                jogo.check_alives(packet.data[0], packet.data[1], mao, maquina)
-                con.send_data(config, jogo.alives, 'update', (maquina + 3) % 4)
-                jogo.end_hand(mao, rodada, jogo.alives)
-            elif packet.kind == 'update': #Means the hand is over and you need to become the new dealer
-                if maquina == mao.dealer:
-                    carteador = Dealer(jogo.handSize+1, len(jogo.alives))
-                    mao.update_shackle(carteador.shackle)
-                    con.send_data(config, mao.shackle, 'shackle', (maquina + 3) % 4)
-                    mao.update_cards(carteador.hands[jogo.alives.index(maquina)], jogo)
-                else:
-                    con.send_token(config)
-            else:
-                con.send_token(config)
-        else: # Case where you just received the token and hasn't sent any packet yet
-            if mao.bet == None: 
-                if len(mao.cards) > 0: # If you haven't bet and have cards, you need to bet
-                    mao.place_bet(mao.bet, len(jogo.alives))
-                    con.send_data(config, mao.bet, 'bet', (maquina + 3) % 4)
-                elif maquina == mao.dealer: # You have no cards and no bet, so either you are the dealer or you are waiting for the dealer to distribute the cards
-                    carteador = Dealer(jogo.handSize+1, len(jogo.alives))
-                    mao.update_shackle(carteador.shackle)
-                    con.send_data(config, mao.shackle, 'shackle', (maquina + 3) % 4)
-                    mao.update_cards(carteador.hands[jogo.alives.index(maquina)], jogo)
-                else:
-                    con.send_token(config)
-            elif len(mao.cards) > 0:
-                if len(rodada.plays) == 0: # If nobody played on this turn, you must be the previous turn winner to start
-                    if maquina == rodada.starter:
-                        card = rodada.play_card(mao.cards, mao)
-                        con.send_data(config, card, 'play', (maquina + 3) % 4)
-                        rodada.set_card(maquina, card)
-                    else:
-                        con.send_token(config)
-                elif len(rodada.plays) != len(jogo.alives): # Means you didn't play this turn, so you need to play
-                    card = rodada.play_card(mao.cards, mao)
-                    con.send_data(config, card, 'play', (maquina + 3) % 4)
-                    rodada.set_card(maquina, card)
-                else: # Everybody played, you need to check the winner
-                    con.send_data(config, rodada.winning, 'win', (maquina + 3) % 4)
-                    rodada.check_winner(rodada.winning, mao, maquina)
-            else: # If you don't have cards, the hand is over and you need to check who is alive
-                con.send_data(config, [jogo.alives, rodada.winning], 'check', (maquina + 3) % 4)
-    if jogo.lifes <= 0:
-        print("Você perdeu!")
-    else:
-        print("Você ganhou!")
-                
-
-if __name__ == '__main__':
-    main()
+            con.send_packet(packet, config)
+        elif packet.origin != machine:
+            check_packet_player(packet, machine, cards, lifes, size, dealer)
+        else:
+            check_packet_dealer(packet, machine, cards, lifes, size, dealer)

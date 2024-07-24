@@ -3,12 +3,14 @@ import pickle
 
 class Packet:
     def __init__(self, origin, destiny, data, kind):
+        self.initmarker = '1111'
         self.origin = origin
         self.destiny = destiny
         self.data = data
         self.kind = kind
         self.confirmation = False
         self.error = False
+        self.endmarker = '0000'
 
 def send_packet(packet, config):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -39,8 +41,11 @@ def send_token(config):
     packet = Packet(origin, destiny, 'token', 'token')
     send_packet(packet, config)
 
-def send_data(config, data, kind):
+def send_data(config, data, kind, destiny):
     origin = int(config['MAQUINA'])
-    destiny = (origin+3)%4
     packet = Packet(origin, destiny, data, kind)
+    send_packet(packet, config)
+
+def retransmit(packet, config):
+    packet.error = True
     send_packet(packet, config)

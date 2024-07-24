@@ -23,143 +23,46 @@ class Deck:
     
     def get_shackle(self):
         shackle = self.cards.pop()
-        for card in self.cards:
-            if card.weight == (shackle.weight+1) % 10:
-                card.weight += self.suits.index(card.suit) + 10
         return shackle
     
     def get_hands(self, num, players):
         return [[self.cards.pop() for _ in range(num)] for _ in range(players)]
-
-
-
-class Game:
-    def __init__(self):
-        self.alives = [0, 1, 2, 3]
-        self.handSize = 1
-        self.lifes = 7
-        self.message = 'FODA-SE'
-
-    def check_alives(self, alives, winner, hand, machine):
-        os.system('clear')
-        print ("Vencedor da rodada: ", winner)
-        if winner == machine:
-            hand.points += 1
-        self.alives = alives
-        self.lifes -= abs(hand.bet - hand.points)
-        if self.lifes <= 0:
-            print ("Você perdeu!")
-            self.alives.remove(machine)
-
-    def end_hand(self, hand, turn, alives):
-        self.alives = alives
-        turn.plays = []
-        turn.winning = None
-        hand.end(self)
-        turn.starter = self.alives[(self.alives.index(hand.dealer)+1) % len(self.alives)]
-        if self.lifes > 0:
-            print ("Vidas: ", self.message[:self.lifes])
-
-    def is_over(self):
-        return len(self.alives) == 1
-
-class Hand:
-    def __init__(self):
-        self.points = 0
-        self.cards = []
-        self.shackle = None
-        self.bet = None
-        self.bet_sum = 0
-        self.bet_quantity = 0
-        self.dealer = 0
-
-    def end(self, jogo):
-        self.points = 0
-        self.cards = []
-        self.shackle = None
-        self.bet = None
-        self.bet_sum = 0
-        self.bet_quantity = 0
-        x = 3 if self.dealer == 0 else self.dealer - 1
-        while x not in jogo.alives:
-            x -= 1
-            if x == -1:
-                x = 3
-        self.dealer = x
-        
-
-    def update_bets(self, bet):
-        self.bet_quantity += 1
-        self.bet_sum += bet
-
-    def update_cards(self, hand, game):
-        self.cards = hand
-        game.handSize = len(self.cards)
-        print ("Cartas: ", self.cards)
-
-    def update_shackle(self, shackle):
-        self.shackle = shackle
-        print ("Manilha: ", self.shackle)
-
-    def place_bet(self, bet, alives):
-        print ("Apostas até agora: ", self.bet_sum)
-        self.bet = int(input("Digite a aposta: "))
-        if self.bet_quantity == alives - 1:
-            while (self.bet + self.bet_sum == len(self.cards)):
-                self.bet = int(input("A soma das apostas não pode ser igual ao número de cartas, escolha novamente: "))
-        self.bet_sum += self.bet
-        self.bet_quantity += 1
         
 class Dealer:
-    def __init__(self, num, players):
+    def __init__(self, num, vidas):
         self.deck = Deck()
         self.deck.shuffle()
+        self.hands = self.deck.get_hands(num, 4) if num <=13 else self.deck.get_hands(13, 4)
         self.shackle = self.deck.get_shackle()
-        self.hands = self.deck.get_hands(num,players) if num <=13 else self.deck.get_hands(13, players)
+        self.bets = [0,0,0,0]
+        self.points = [0,0,0,0]
+        self.lifes = vidas
+        self.plays = []
+        self.winner = None
 
-    def distribute_hands(self, player, config, vivos):
-        index = vivos.index(player)
-        for i in range(index+1, index+len(vivos)):
-            con.send_data(config, self.hands[i%len(vivos)], 'hand', vivos[i%len(vivos)])
+    def distribute_hands(self, player, config):
+        for i in range(player+1, player+4): 
+            con.send_data(config, self.hands[i%4], 'hand', i%4)
             packet = con.receive_packet(config)
             if packet.confirmation == False:
                 print ("Erro: Destino não está na rede")
                 con.send_data(config, 'Destino não está na rede', 'erro', (player+3)%4)
                 exit(1)
 
-class Turn:
-    def __init__(self):
-        self.winning = None
-        self.starter = 1
-        self.plays = []
-
-    def set_card(self, player, card):
-        for play in self.plays:
-            if card.weight == play[0].weight:
-                card.weight = play[0].weight = -1
-        self.plays.append([card, player])
-        self.winning = max(self.plays, key= lambda play: play[0].weight)
-        self.winning = self.winning[1] if self.winning[0].weight != -1 else None
-
-
-    def check_winner(self, winner, hand, machine):
-        os.system('clear')
-        if winner == machine:
-            hand.points += 1
-        self.starter = winner if winner != None else self.starter
-        print ("Vencedor da rodada: ", winner)
-        self.plays = []
-        self.winning = None
-
-    def play_card(self, cards, hand):
-        print ("Manilha: ", hand.shackle)
-        print ("Cartas jogadas até agora: ")
-        for play in self.plays:
-            print (f"Jogador {play[1]} jogou {play[0]}")
-        print ("Suas cartas: ")
-        for i, card in enumerate(cards):
-            print (f"{i} - {card}")
-        card = int(input("Digite o número da carta que deseja jogar: "))
-        return cards.pop(card)
-        
-
+    def check_winner(self):
+        for i, play in enumerate(self.plays):
+            if play[1].weight == self.shackle.weight + 1:
+                play[1].weight += 10 + self.deck.suits.index(play[1].suit)
+            for j in range(i+1, len(self.plays)):
+                if play[1].weight == self.plays[j].weight:
+                    self.plays[j].weight = -1
+                play[1].weight = -1
+        self.winner = max(self.plays, key= lambda play: play[1].weight)
+        self.winner = self.winner[0] if self.winner[1].weight != -1 else None
+        if self.winner != None:
+            self.roundsWon[self.winner] += 1
+            
+    def update_lifes(self):
+        for i in range(4):
+            self.lifes[i] -= abs(self.points[i] - self.bets[i])
+            
