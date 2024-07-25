@@ -41,26 +41,30 @@ class Dealer:
         self.winner = None
 
     def distribute_hands(self, player, config):
-        for i in range(player+1, player+4): 
-            con.send_data(config, self.hands[i%4], 'hand', i%4)
+        for i in range(1,4): 
+            con.send_data(config, self.hands[(player+i)%4], 'hand', i)
             packet = con.receive_packet(config)
             if packet.confirmation == False:
                 print ("Erro: Destino não está na rede")
-                con.send_data(config, 'Destino não está na rede', 'erro', (player+3)%4)
+                con.send_data(config, 'Destino não está na rede', 'erro')
                 exit(1)
 
     def check_winner(self):
+        repeated = False
         for i, play in enumerate(self.plays):
             if play[1].weight == self.shackle.weight + 1:
                 play[1].weight += 10 + self.deck.suits.index(play[1].suit)
             for j in range(i+1, len(self.plays)):
-                if play[1].weight == self.plays[j].weight:
-                    self.plays[j].weight = -1
+                if play[1].weight == self.plays[j][1].weight:
+                    self.plays[j][1].weight = -1
+                    repeated = True
+            if repeated:
                 play[1].weight = -1
+                repeated = False
         self.winner = max(self.plays, key= lambda play: play[1].weight)
         self.winner = self.winner[0] if self.winner[1].weight != -1 else None
         if self.winner != None:
-            self.roundsWon[self.winner] += 1
+            self.points[self.winner] += 1
             
     def update_lifes(self):
         for i in range(4):
