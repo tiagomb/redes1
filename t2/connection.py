@@ -8,7 +8,6 @@ class Packet:
         self.data = data
         self.kind = kind
         self.confirmation = False
-        self.error = False
 
 def send_packet(packet, config):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -32,12 +31,6 @@ def receive_packet(config):
         print(f"Erro ao receber pacote: {e}")
     finally:
         sock.close()
-
-def send_token(config):
-    origin = int(config['MAQUINA'])
-    destiny = (origin + 1) % 4
-    packet = Packet(origin, destiny, 'token', 'token')
-    send_packet(packet, config)
 
 def send_data(config, data, kind, offset=3):
     origin = int(config['MAQUINA'])

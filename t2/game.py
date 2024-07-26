@@ -69,4 +69,56 @@ class Dealer:
     def update_lifes(self):
         for i in range(4):
             self.lifes[i] -= abs(self.points[i] - self.bets[i])
-            
+
+class Controller:
+    def __init__(self):
+        self.cards = []
+        self.shackle = None
+        self.lifes = [7,7,7,7]
+        self.alives = 4
+        self.handSize = 1
+
+    def update_shackle(self, shackle):
+        print ("Manilha: ", shackle)
+        self.shackle = shackle
+
+    def update_hand(self, hand):
+        print ("Suas cartas: ", hand)
+        self.cards = hand
+    
+    def bet(self, bets, machine):
+        jogadas = int(input("Quantos pontos você faz: "))
+        bets[machine] = jogadas
+
+    def show_bets(self, bets):
+        print ("Apostas: ", end = "")
+        for i, aposta in enumerate(bets):
+            print(f"Jogador {i}: {aposta}", end = "  ")
+        print()
+
+    def show_plays(self, plays):
+        print ("Manilha: ", shackle)
+        print ("Cartas jogadas: ", end = "")
+            for play in plays:
+                print (f"Jogador {play[0]}: {play[1]}", end= "  ")
+        print()
+
+    def play(self):
+        print ("Suas cartas: ", end = "")
+        for i, card in enumerate(self.cards):
+            print (f"{i}: {card}", end="  ")
+        print()
+        num = int(input("Digite o número da carta que deseja jogar: "))
+        card = self.cards.pop(num)
+        return card
+
+    def show_winner(self, winner):
+        os.system('clear')
+        print ("Vencedor da rodada: ", winner)
+
+    def update_lifes(self, lifes):
+        self.lifes = lifes
+        print("Vidas: ", lifes[machine])
+        if self.size < 13:
+            self.size+=1 
+        self.alives = sum(x>0 for x in self.lifes)
