@@ -121,7 +121,6 @@ void trata_pacote(int soquete, unsigned char *buffer_sequencia){
 int main(int argc, char const* argv[]){
     int soquete = cria_raw_socket("enp5s0");
     unsigned char buffer_sequencia[TAMANHO] = { 0 };
-	lista_videos(soquete);
     while (1){
         trata_pacote(soquete, buffer_sequencia);
     }

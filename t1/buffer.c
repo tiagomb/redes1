@@ -159,7 +159,7 @@ protocolo_t *recebe_confirmacao(int soquete, unsigned int *last_seq){
             case 2:
                 fprintf(stderr, "Arquivo nao encontrado\n");
                 break;
-            case 4:
+            case 3:
                 fprintf(stderr, "Sem espaço\n");
                 break;
             default:
