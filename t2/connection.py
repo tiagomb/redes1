@@ -39,8 +39,8 @@ def send_token(config):
     packet = Packet(origin, destiny, 'token', 'token')
     send_packet(packet, config)
 
-def send_data(config, data, kind):
+def send_data(config, data, kind, offset=3):
     origin = int(config['MAQUINA'])
-    destiny = (origin+3)%4
+    destiny = (origin+offset)%4
     packet = Packet(origin, destiny, data, kind)
     send_packet(packet, config)
