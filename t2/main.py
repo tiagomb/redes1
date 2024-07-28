@@ -1,6 +1,6 @@
 import config as cfg
 import connection as con
-from game import Dealer, controller
+from game import Dealer, Controller
 import os
    
 def main():
@@ -9,7 +9,7 @@ def main():
     controller = Controller()
     dealer = None
     if machine == 0:
-        dealer = Dealer(1, lifes)
+        dealer = Dealer(1, controller.lifes)
         controller.update_hand(dealer.hands[0])
         dealer.distribute_hands(0, config)
         controller.update_shackle(dealer.shackle)
@@ -42,9 +42,9 @@ def main():
             elif packet.kind == 'winner':
                 controller.show_winner(packet.data)
             elif packet.kind == 'update':
-                controller.update_lifes(packet.data)
+                controller.update_lifes(packet.data, machine)
             elif packet.kind == 'token':
-                dealer = Dealer(size, lifes)
+                dealer = Dealer(controller.handSize, controller.lifes)
                 controller.update_hand(dealer.hands[machine])
                 dealer.distribute_hands(machine, config)
                 controller.update_shackle(dealer.shackle)
@@ -68,7 +68,7 @@ def main():
                 controller.show_bets(dealer.bets)
                 con.send_data(config, dealer.bets, 'show')
             elif packet.kind == 'show':
-                print ("Manilha: ", shackle)
+                print ("Manilha: ", controller.shackle)
                 card = controller.play()
                 dealer.plays.append([machine, card])
                 con.send_data(config, dealer.plays, 'play')
@@ -80,13 +80,13 @@ def main():
             elif packet.kind == 'winner':
                 if len(controller.cards) > 0:
                     dealer.plays = []
-                    print ("Manilha: ", shackle)
+                    print ("Manilha: ", controller.shackle)
                     card = controller.play()
                     dealer.plays.append([machine, card])
                     con.send_data(config, dealer.plays, 'play')
                 else:
                     dealer.update_lifes()
-                    controller.update_lifes(dealer.lifes)
+                    controller.update_lifes(dealer.lifes, machine)
                     con.send_data(config, dealer.lifes, 'update')
             else:
                 con.send_data(config, None, 'token')
