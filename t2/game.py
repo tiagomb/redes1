@@ -97,10 +97,10 @@ class Controller:
         print()
 
     def show_plays(self, plays):
-        print ("Manilha: ", shackle)
+        print ("Manilha: ", self.shackle)
         print ("Cartas jogadas: ", end = "")
-            for play in plays:
-                print (f"Jogador {play[0]}: {play[1]}", end= "  ")
+        for play in plays:
+            print (f"Jogador {play[0]}: {play[1]}", end= "  ")
         print()
 
     def play(self):
@@ -116,9 +116,9 @@ class Controller:
         os.system('clear')
         print ("Vencedor da rodada: ", winner)
 
-    def update_lifes(self, lifes):
+    def update_lifes(self, lifes, machine):
         self.lifes = lifes
         print("Vidas: ", lifes[machine])
-        if self.size < 13:
-            self.size+=1 
+        if self.handSize < 13:
+            self.handSize+=1 
         self.alives = sum(x>0 for x in self.lifes)
