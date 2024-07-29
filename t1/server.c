@@ -23,7 +23,7 @@
 unsigned int sequencia = 31;
 unsigned int last_seq = 31;
 
-void lista_videos(int soquete){
+void lista_videos(int soquete, unsigned char *buffer_sequencia){
     DIR* diretorio = opendir(DIRETORIO);
     if (diretorio == NULL){
         unsigned char buffer[TAMANHO] = { 0 };
@@ -109,7 +109,7 @@ void trata_pacote(int soquete, unsigned char *buffer_sequencia){
             snprintf((char *) buffer_sequencia, TAMANHO, "%d", pacote.sequencia);
 			switch (pacote.tipo){
 				case LISTA:
-                    lista_videos(soquete);
+                    lista_videos(soquete, buffer_sequencia);
 					break;
 				case BAIXAR:
                     manda_video(soquete, pacote, buffer_sequencia);
