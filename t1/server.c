@@ -23,10 +23,38 @@
 unsigned int sequencia = 31;
 unsigned int last_seq = 31;
 
-protocolo_t *janela[JANELA] = { NULL, NULL, NULL, NULL, NULL };
+unsigned char *janela[JANELA];
 
-void lista_videos(int soquete){
-    DIR* diretorio = opendir("./videos");
+unsigned int retorna_diff(unsigned int sequencia){
+    protocolo_t *pacote = (protocolo_t *) janela[JANELA-1];
+    unsigned int last_seq = pacote->sequencia;
+    unsigned int diff = last_seq - sequencia;
+    if (diff < 0){
+        diff += 32;
+    }
+    return diff;
+}
+
+void lista_videos(int soquete, unsigned char *buffer_sequencia){
+    DIR* diretorio = opendir(DIRETORIO);
+    if (diretorio == NULL){
+        unsigned char buffer[TAMANHO] = { 0 };
+        switch (errno){
+            case EACCES:
+                snprintf((char *) buffer, TAMANHO, "%d", 1);
+                envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen((char *) buffer));
+                break;
+            case ENOENT:
+                snprintf((char *) buffer, TAMANHO, "%d", 2);
+                envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen((char *) buffer));
+                break;
+            default:
+                snprintf((char *) buffer, TAMANHO, "%d", 4);
+                envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen((char *) buffer));
+                break;
+        }
+    }
+    envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char*) buffer_sequencia));
     unsigned char nome[TAMANHO] = { 0 };
     struct dirent* entrada = NULL;
     while ((entrada = readdir(diretorio)) != NULL){
@@ -44,7 +72,7 @@ void lista_videos(int soquete){
 void le_arquivo(int soquete, char *nome){
     FILE *arquivo = fopen(nome, "rb");
     unsigned char *buffer = malloc(TAMANHO);
-    int removidos, lidos = 0, aceito = -1;
+    int removidos, lidos = 0, aceito = -1, sequencia = 0, diff = 0;
     protocolo_t *confirmacao;
     for (int i = 0; i < JANELA; i++){
         lidos = fread(buffer, 1, TAMANHO, arquivo);
@@ -56,18 +84,15 @@ void le_arquivo(int soquete, char *nome){
     }
     while (lidos > 0){
         confirmacao = recebe_confirmacao(soquete, &last_seq);
-        sscanf((char *) confirmacao->dados, "%d", &aceito);
-        switch (confirmacao->tipo){
+        aceito = confirmacao->tipo;
+        sequencia = sscanf((char *) confirmacao->dados, "%d", &sequencia);
+        diff = retorna_diff(sequencia);
+        switch (aceito){
             case ACK:
-                int diff = aceito - janela[0]->sequencia + 1;
                 for (int i = 0; i < diff; i++){
-                    free(janela[i]);
-                    janela[i] = NULL;
+                    memcpy(janela[i], janela[i+JANELA-diff], sizeof(protocolo_t));
                 }
-                for (int i = 0; i < JANELA - diff; i++){
-                    janela[i] = janela[i + diff];
-                }
-                for (int i = JANELA - diff; i < JANELA; i++){
+                for (int i = diff; i < JANELA; i++){
                     lidos = fread(buffer, 1, TAMANHO, arquivo);
                     removidos = insere_vlan(buffer);
                     fseek(arquivo, -removidos, SEEK_CUR);
@@ -75,11 +100,23 @@ void le_arquivo(int soquete, char *nome){
                     send(soquete, janela[i], sizeof(protocolo_t), 0);
                     memset(buffer, 0, TAMANHO);
                 }
-                break;
             case NACK:
-                if (aceito == janela[0]->sequencia){
+                diff += 1;
+                if (diff == JANELA){
                     for (int i = 0; i < JANELA; i++){
                         send(soquete, janela[i], sizeof(protocolo_t), 0);
+                    }
+                } else {
+                    for (int i = 0; i < diff; i++){
+                        memcpy(janela[i], janela[i+JANELA-diff], sizeof(protocolo_t));
+                    }
+                    for (int i = diff; i < JANELA; i++){
+                        lidos = fread(buffer, 1, TAMANHO, arquivo);
+                        removidos = insere_vlan(buffer);
+                        fseek(arquivo, -removidos, SEEK_CUR);
+                        janela[i] = monta_buffer(inc_seq(&sequencia), DADOS, buffer, lidos);
+                        send(soquete, janela[i], sizeof(protocolo_t), 0);
+                        memset(buffer, 0, TAMANHO);
                     }
                 }
                 break;
@@ -88,31 +125,17 @@ void le_arquivo(int soquete, char *nome){
                     send(soquete, janela[i], sizeof(protocolo_t), 0);
                 }
                 break;
-            default:
-                printf("Erro desconhecido\n");
-                exit(1);
-                break;
+        }
     }
+    fclose(arquivo);
+    free(buffer);
+    trata_envio(soquete, &sequencia, FIM_TRANSMISSAO, NULL, 0, &last_seq);
 }
 
-// void le_arquivo(int soquete, char *nome){
-//     FILE *arquivo = fopen(nome, "rb");
-//     unsigned char *buffer = malloc(TAMANHO);
-//     int removidos, lidos = 0;
-//     while ((lidos = fread(buffer, 1, TAMANHO, arquivo)) > 0){
-//         removidos = insere_vlan(buffer);
-//         fseek(arquivo, -removidos, SEEK_CUR);
-//         trata_envio(soquete, &sequencia, DADOS, buffer, lidos, &last_seq);
-//         memset(buffer, 0, TAMANHO);
-//     }
-//     fclose(arquivo);
-//     trata_envio(soquete, &sequencia, FIM_TRANSMISSAO, NULL, 0, &last_seq);
-// }
-
 void manda_video(int soquete, protocolo_t pacote, unsigned char *buffer_sequencia){
-    char nome[73] = { 0 };
+    char nome[TAMANHO + 10] = { 0 };
     unsigned char *buffer = malloc(TAMANHO);
-    snprintf(nome, 73, "./videos/%s", pacote.dados);
+    snprintf(nome, TAMANHO+10, "%s/%s", DIRETORIO, pacote.dados);
     struct stat info;
     if (stat(nome, &info) == -1){
         switch (errno){
@@ -135,18 +158,18 @@ void manda_video(int soquete, protocolo_t pacote, unsigned char *buffer_sequenci
     envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
     snprintf((char *) buffer, TAMANHO, "%ld %ld", info.st_size/1000000, info.st_ctime);
     trata_envio(soquete, &sequencia, DESCRITOR, buffer, strlen((char *) buffer), &last_seq);
+    free(buffer);
     le_arquivo(soquete, nome);
 }
 
 void trata_pacote(int soquete, unsigned char *buffer_sequencia){
 	protocolo_t pacote;
-	switch (recebe_buffer(soquete, &pacote, &last_seq)){
+	switch (recebe_buffer(soquete, &pacote, &last_seq, 0)){
 		case ACK:
             snprintf((char *) buffer_sequencia, TAMANHO, "%d", pacote.sequencia);
 			switch (pacote.tipo){
 				case LISTA:
-                    envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char*) buffer_sequencia));
-                    lista_videos(soquete);
+                    lista_videos(soquete, buffer_sequencia);
 					break;
 				case BAIXAR:
                     manda_video(soquete, pacote, buffer_sequencia);
@@ -172,10 +195,13 @@ void trata_pacote(int soquete, unsigned char *buffer_sequencia){
 	}
 }
 
-int main(int argc, char const* argv[]){
-    int soquete = cria_raw_socket("enp5s0");
+int main(int argc, char *argv[]){
+    if (argc != 2){
+        fprintf(stderr, "Uso: %s <interface de rede>\n", argv[0]);
+        exit(1);
+    }
+    int soquete = cria_raw_socket(argv[1]);
     unsigned char buffer_sequencia[TAMANHO] = { 0 };
-	lista_videos(soquete);
     while (1){
         trata_pacote(soquete, buffer_sequencia);
     }

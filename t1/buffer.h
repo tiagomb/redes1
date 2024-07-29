@@ -3,8 +3,8 @@
 
 #include "header.h"
 
-extern char ultimo_enviado[67];
-extern char ultimo_recebido[67];
+extern unsigned char ultimo_enviado[67];
+extern unsigned char ultimo_recebido[67];
 
 unsigned int inc_seq(unsigned int *sequencia);
 

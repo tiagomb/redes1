@@ -99,9 +99,9 @@ int buffer_eh_valido(protocolo_t *pacote){
     return pacote->marcador == 126;
 }
 
-int recebe_msg(int soquete, unsigned char *buffer){
+int recebe_msg(int soquete, unsigned char *buffer, unsigned int timeout){
     long long int comeco = timestamp();
-    struct timeval timeout = {30000/1000, (30000%1000)*1000};
+    struct timeval timeout = {timeout, timeout * 1000};
     setsockopt(soquete, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     int bytes_recebidos = 0;
     do{
@@ -109,19 +109,18 @@ int recebe_msg(int soquete, unsigned char *buffer){
         if (buffer_eh_valido((protocolo_t*) buffer)){
             return bytes_recebidos;
         }
-    } while (timestamp() - comeco <= 30000);
+    } while (timeout == 0 || timestamp() - comeco <= timeout * 1000);
     return -1;
 }
 
-int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq){
+int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq, unsigned int timeout){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
-    unsigned int seq_esperada = inc_seq(last_seq);
-    struct timeval timeout = {0, 0};
-    setsockopt(soquete, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    unsigned int seq_esperada = inc_seq(last_seq);;
     protocolo_t *pacote_recebido = (protocolo_t*) buffer;
-    recv(soquete, buffer, sizeof(protocolo_t), 0);
-    while (pacote_recebido->marcador != 126){
-        recv(soquete, buffer, sizeof(protocolo_t), 0);
+    recebido = recebe_msg(soquete, buffer, timeout);
+    if (recebido == -1){
+        free(buffer);
+        return TIMEOUT;
     }
     if (calculaCRC(&buffer[1], sizeof(protocolo_t) - 1, tabela_crc) != 0){
         dec_seq(last_seq);
@@ -142,7 +141,7 @@ int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq){
 protocolo_t *recebe_confirmacao(int soquete, unsigned int *last_seq){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
     protocolo_t *pacote = (protocolo_t*) buffer;
-    int recebido = recebe_msg(soquete, buffer);
+    int recebido = recebe_msg(soquete, buffer, 5);
     if (recebido == -1) {
         pacote->tipo = TIMEOUT;
         return pacote;
@@ -159,7 +158,7 @@ protocolo_t *recebe_confirmacao(int soquete, unsigned int *last_seq){
             case 2:
                 fprintf(stderr, "Arquivo nao encontrado\n");
                 break;
-            case 4:
+            case 3:
                 fprintf(stderr, "Sem espaço\n");
                 break;
             default:
@@ -181,27 +180,14 @@ void trata_envio(int soquete, unsigned int *sequencia, unsigned int tipo, unsign
     protocolo_t *pacote = recebe_confirmacao(soquete, last_seq);
     int aceito = pacote->tipo;
     free(pacote);
-    switch (aceito){
-        case ACK:
-            break;
-        case NACK:
-            while (aceito == NACK){
-                envia_buffer(soquete, *sequencia, tipo, dados, tamanho);
-                pacote = recebe_confirmacao(soquete, last_seq);
-                aceito = pacote->tipo;
-                free(pacote);
-            }
-            break;
-        case TIMEOUT:
-            envia_buffer(soquete, *sequencia, tipo, dados, tamanho);
-            pacote = recebe_confirmacao(soquete, last_seq);
-            aceito = pacote->tipo;
-            break;
-        case ERRO:
+    while (aceito != ACK){
+        if (aceito == ERRO){
             fprintf(stderr, "Erro desconhecido\n");
             exit(1);
-            break;
-        default:
-            break;
+        }
+        envia_buffer(soquete, *sequencia, tipo, dados, tamanho);
+        pacote = recebe_confirmacao(soquete, last_seq);
+        aceito = pacote->tipo;
+        free(pacote);
     }
 }
