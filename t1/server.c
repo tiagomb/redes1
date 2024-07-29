@@ -89,8 +89,11 @@ void le_arquivo(int soquete, char *nome){
         diff = retorna_diff(seq_recebida);
         switch (aceito){
             case ACK:
+                for (int i = 0; i < JANELA-diff; i++){
+                    free (janela[i]);
+                }
                 for (int i = 0; i < diff; i++){
-                    memcpy(janela[i], janela[i+JANELA-diff], sizeof(protocolo_t));
+                    janela[i] = janela[i+JANELA-diff];
                 }
                 for (int i = diff; i < JANELA; i++){
                     lidos = fread(buffer, 1, TAMANHO, arquivo);
@@ -107,8 +110,11 @@ void le_arquivo(int soquete, char *nome){
                         send(soquete, janela[i], sizeof(protocolo_t), 0);
                     }
                 } else {
+                    for (int i = 0; i < JANELA-diff; i++){
+                        free (janela[i]);
+                    }
                     for (int i = 0; i < diff; i++){
-                        memcpy(janela[i], janela[i+JANELA-diff], sizeof(protocolo_t));
+                        janela[i] = janela[i+JANELA-diff];
                     }
                     for (int i = diff; i < JANELA; i++){
                         lidos = fread(buffer, 1, TAMANHO, arquivo);

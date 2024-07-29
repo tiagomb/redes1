@@ -115,7 +115,6 @@ int recebe_msg(int soquete, unsigned char *buffer, unsigned int timeoutSec){
 
 int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq, unsigned int timeoutSec){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
-    unsigned int seq_esperada = inc_seq(last_seq);;
     protocolo_t *pacote_recebido = (protocolo_t*) buffer;
     int recebido;
     recebido = recebe_msg(soquete, buffer, timeoutSec);
@@ -124,10 +123,10 @@ int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq, unsi
         return TIMEOUT;
     }
     if (calculaCRC(&buffer[1], sizeof(protocolo_t) - 1, tabela_crc) != 0){
-        dec_seq(last_seq);
         free(buffer);
         return NACK;
     }
+    unsigned int seq_esperada = inc_seq(last_seq);
     if (pacote_recebido->sequencia != seq_esperada){
         dec_seq(last_seq);
         free(buffer);
