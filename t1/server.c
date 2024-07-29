@@ -132,6 +132,10 @@ void le_arquivo(int soquete, char *nome){
                 }
                 break;
         }
+        free(confirmacao);
+    }
+    for (int i = 0; i < JANELA; i++){
+        free(janela[i]);
     }
     fclose(arquivo);
     free(buffer);

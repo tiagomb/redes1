@@ -75,12 +75,10 @@ unsigned char *monta_buffer(unsigned int sequencia, unsigned int tipo, unsigned 
     pacote->tamanho = tamanho;
     pacote->sequencia = sequencia;
     pacote->tipo = tipo;
-    memset(pacote->dados, 0, TAMANHO);
     memcpy(pacote->dados, dados, tamanho);
     pacote->crc = calculaCRC(&buffer[1], sizeof(protocolo_t) - 2, tabela_crc);
     memcpy(ultimo_enviado, buffer, sizeof(protocolo_t));
     return buffer;
-
 }
 
 int envia_buffer(int soquete, unsigned int sequencia, unsigned int tipo, unsigned char* dados, unsigned int tamanho){
@@ -124,16 +122,18 @@ int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq, unsi
     }
     if (calculaCRC(&buffer[1], sizeof(protocolo_t) - 1, tabela_crc) != 0){
         free(buffer);
+        memcpy(pacote, buffer, sizeof(protocolo_t));
         return NACK;
     }
     unsigned int seq_esperada = inc_seq(last_seq);
     if (pacote_recebido->sequencia != seq_esperada){
         dec_seq(last_seq);
+        memcpy(pacote, buffer, sizeof(protocolo_t));
         free(buffer);
         return NACK;
     }
     memcpy(ultimo_recebido, buffer, sizeof(protocolo_t));
-    memcpy(pacote, pacote_recebido, sizeof(protocolo_t));
+    memcpy(pacote, buffer, sizeof(protocolo_t));
     free(buffer);
     return ACK;
 }

@@ -2,6 +2,7 @@
 #define buffer___h_
 
 #include "header.h"
+#include <stdio.h>
 
 extern unsigned char ultimo_enviado[67];
 extern unsigned char ultimo_recebido[67];
