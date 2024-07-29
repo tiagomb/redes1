@@ -60,15 +60,15 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome, unsigned char 
 	int removidos;
 	sscanf((char *) pacote.dados, "%ld %ld", &tam, &data);
 	struct statvfs stat;
-	statvfs("./videos", &stat);
+	statvfs(DIRETORIO, &stat);
 	if ((tam + 5) * 1000000 > stat.f_bsize * stat.f_bavail){
 		snprintf((char *) buffer, TAMANHO, "%d", 3);
 		envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen((char *) buffer));
 		exit(1);
 	}
-	printf ("Baixando %s no diretório ./videos\n", nome);
+	printf ("Baixando %s no diretório %s\n", nome, DIRETORIO);
 	envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
-	snprintf(caminho, strlen(nome) + 10, "./videos/%s", nome);
+	snprintf(caminho, strlen(nome) + 10, "%s/%s", DIRETORIO, nome);
 	FILE *arquivo = fopen(caminho, "w");
 	int ack = 0;
 	while (pacote.tipo != FIM_TRANSMISSAO || !ack){
@@ -167,16 +167,15 @@ void trata_pacote(int soquete, unsigned char *input, unsigned char *buffer_seque
 	}
 }
 
-int main(int argc, char const* argv[]){
-	int soquete = cria_raw_socket("enp2s0f1");
+int main(int argc, char *argv[]){
+	if (argc != 2){
+        fprintf(stderr, "Uso: %s <interface de rede>\n", argv[0]);
+        exit(1);
+    }
+    int soquete = cria_raw_socket(argv[1]);
 	unsigned char input[TAMANHO], buffer_sequencia[TAMANHO];
-	DIR *dir = opendir("./videos");
-	if(dir){
-		closedir(dir);
-	} else if (ENOENT == errno){
-		mkdir("./videos", 0777);
-		dir = opendir("./videos");
-	}
+	DIR *dir = opendir(DIRETORIO);
+	dir ? closedir(dir) : mkdir(DIRETORIO, 0777);
 	trata_envio(soquete, &sequencia, LISTA, NULL, 0, &last_seq);
 	while (1){
 		trata_pacote(soquete, input, buffer_sequencia);

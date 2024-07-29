@@ -23,5 +23,6 @@ typedef struct __attribute__((__packed__)) protocolo{
 #define ERRO 31
 #define JANELA 5
 #define TAMANHO 63
+#define DIRETORIO "./videos"
 
 #endif //header___h_

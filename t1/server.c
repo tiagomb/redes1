@@ -24,7 +24,25 @@ unsigned int sequencia = 31;
 unsigned int last_seq = 31;
 
 void lista_videos(int soquete){
-    DIR* diretorio = opendir("./videos");
+    DIR* diretorio = opendir(DIRETORIO);
+    if (diretorio == NULL){
+        unsigned char buffer[TAMANHO] = { 0 };
+        switch (errno){
+            case EACCES:
+                snprintf((char *) buffer, TAMANHO, "%d", 1);
+                envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen((char *) buffer));
+                break;
+            case ENOENT:
+                snprintf((char *) buffer, TAMANHO, "%d", 2);
+                envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen((char *) buffer));
+                break;
+            default:
+                snprintf((char *) buffer, TAMANHO, "%d", 4);
+                envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, strlen((char *) buffer));
+                break;
+        }
+    }
+    envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char*) buffer_sequencia));
     unsigned char nome[TAMANHO] = { 0 };
     struct dirent* entrada = NULL;
     while ((entrada = readdir(diretorio)) != NULL){
@@ -55,9 +73,9 @@ void le_arquivo(int soquete, char *nome){
 }
 
 void manda_video(int soquete, protocolo_t pacote, unsigned char *buffer_sequencia){
-    char nome[73] = { 0 };
+    char nome[TAMANHO + 10] = { 0 };
     unsigned char *buffer = malloc(TAMANHO);
-    snprintf(nome, 73, "./videos/%s", pacote.dados);
+    snprintf(nome, TAMANHO+10, "%s/%s", DIRETORIO, pacote.dados);
     struct stat info;
     if (stat(nome, &info) == -1){
         switch (errno){
@@ -91,7 +109,6 @@ void trata_pacote(int soquete, unsigned char *buffer_sequencia){
             snprintf((char *) buffer_sequencia, TAMANHO, "%d", pacote.sequencia);
 			switch (pacote.tipo){
 				case LISTA:
-                    envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char*) buffer_sequencia));
                     lista_videos(soquete);
 					break;
 				case BAIXAR:
@@ -118,8 +135,12 @@ void trata_pacote(int soquete, unsigned char *buffer_sequencia){
 	}
 }
 
-int main(int argc, char const* argv[]){
-    int soquete = cria_raw_socket("enp5s0");
+int main(int argc, char *argv[]){
+    if (argc != 2){
+        fprintf(stderr, "Uso: %s <interface de rede>\n", argv[0]);
+        exit(1);
+    }
+    int soquete = cria_raw_socket(argv[1]);
     unsigned char buffer_sequencia[TAMANHO] = { 0 };
     while (1){
         trata_pacote(soquete, buffer_sequencia);
