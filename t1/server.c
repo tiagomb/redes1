@@ -72,7 +72,7 @@ void lista_videos(int soquete, unsigned char *buffer_sequencia){
 void le_arquivo(int soquete, char *nome){
     FILE *arquivo = fopen(nome, "rb");
     unsigned char *buffer = malloc(TAMANHO);
-    int removidos, lidos = 0, aceito = -1, sequencia = 0, diff = 0;
+    int removidos, lidos = 0, aceito = -1, seq_recebida = 0, diff = 0;
     protocolo_t *confirmacao;
     for (int i = 0; i < JANELA; i++){
         lidos = fread(buffer, 1, TAMANHO, arquivo);
@@ -85,8 +85,8 @@ void le_arquivo(int soquete, char *nome){
     while (lidos > 0){
         confirmacao = recebe_confirmacao(soquete, &last_seq);
         aceito = confirmacao->tipo;
-        sequencia = sscanf((char *) confirmacao->dados, "%d", &sequencia);
-        diff = retorna_diff(sequencia);
+        sscanf((char *) confirmacao->dados, "%d", &seq_recebida);
+        diff = retorna_diff(seq_recebida);
         switch (aceito){
             case ACK:
                 for (int i = 0; i < diff; i++){
