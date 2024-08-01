@@ -113,9 +113,8 @@ int recebe_msg(int soquete, unsigned char *buffer){
     return -1;
 }
 
-int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq){
+int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq, unsigned int *seq_esperada){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
-    unsigned int seq_esperada = inc_seq(last_seq);
     struct timeval timeout = {0, 0};
     setsockopt(soquete, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     protocolo_t *pacote_recebido = (protocolo_t*) buffer;
@@ -123,23 +122,19 @@ int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq){
     while (!buffer_eh_valido(pacote_recebido)){
         recv(soquete, buffer, sizeof(protocolo_t), 0);
     }
-    if (calculaCRC(&buffer[1], sizeof(protocolo_t) - 1, tabela_crc) != 0){
-        dec_seq(last_seq);
+    if (calculaCRC(&buffer[1], sizeof(protocolo_t) - 1, tabela_crc) != 0 || pacote_recebido->sequencia != *seq_esperada){
         free(buffer);
         return NACK;
     }
-    if (pacote_recebido->sequencia != seq_esperada){
-        dec_seq(last_seq);
-        free(buffer);
-        return NACK;
-    }
+    *last_seq = *seq_esperada;
+    inc_seq(seq_esperada);
     memcpy(ultimo_recebido, buffer, sizeof(protocolo_t));
     memcpy(pacote, pacote_recebido, sizeof(protocolo_t));
     free(buffer);
     return ACK;
 }
 
-protocolo_t *recebe_confirmacao(int soquete, unsigned int *last_seq){
+protocolo_t *recebe_confirmacao(int soquete, unsigned int *last_seq, unsigned int *seq_esperada){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
     protocolo_t *pacote = (protocolo_t*) buffer;
     int recebido = recebe_msg(soquete, buffer);
@@ -147,11 +142,12 @@ protocolo_t *recebe_confirmacao(int soquete, unsigned int *last_seq){
         pacote->tipo = TIMEOUT;
         return pacote;
     }
-    inc_seq(last_seq);
+    *last_seq = *seq_esperada;
+    inc_seq(seq_esperada);
     memcpy(ultimo_recebido, buffer, sizeof(protocolo_t));
     if (pacote->tipo == ERRO){
-        int erro;
-        sscanf ((char *) pacote->dados, "%d", &erro);
+        unsigned int erro;
+        memcpy(&erro, pacote->dados, sizeof(unsigned int));
         switch (erro){
             case 1:
                 fprintf(stderr, "Permissao negada\n");
@@ -176,9 +172,9 @@ protocolo_t *recebe_confirmacao(int soquete, unsigned int *last_seq){
     return pacote;
 }
 
-void trata_envio(int soquete, unsigned int *sequencia, unsigned int tipo, unsigned char *dados, unsigned int tamanho, unsigned int *last_seq){
+void trata_envio(int soquete, unsigned int *sequencia, unsigned int tipo, unsigned char *dados, unsigned int tamanho, unsigned int *last_seq, unsigned int *seq_esperada){
     envia_buffer(soquete, inc_seq(sequencia), tipo, dados, tamanho);
-    protocolo_t *pacote = recebe_confirmacao(soquete, last_seq);
+    protocolo_t *pacote = recebe_confirmacao(soquete, last_seq, seq_esperada);
     int aceito = pacote->tipo;
     free(pacote);
     while (aceito != ACK){
@@ -187,7 +183,7 @@ void trata_envio(int soquete, unsigned int *sequencia, unsigned int tipo, unsign
             exit(1);
         }
         envia_buffer(soquete, *sequencia, tipo, dados, tamanho);
-        pacote = recebe_confirmacao(soquete, last_seq);
+        pacote = recebe_confirmacao(soquete, last_seq, seq_esperada);
         aceito = pacote->tipo;
         free(pacote);
     }
