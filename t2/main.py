@@ -6,7 +6,7 @@ import os
 def main():
     machine = int(input("Digite o número da máquina(0 a 3): "))
     config = cfg.get_config(machine)
-    controller = Controller()
+    controller = Controller(machine)
     dealer = None
     if machine == 0:
         dealer = Dealer(1, controller.lifes)
@@ -32,7 +32,7 @@ def main():
             elif packet.kind == 'shackle':
                 controller.update_shackle(packet.data)
             elif packet.kind == 'bet':
-                controller.bet(packet.data, machine)
+                controller.bet(packet.data)
             elif packet.kind == 'show':
                 controller.show_bets(packet.data)
             elif packet.kind == 'play':
@@ -42,7 +42,7 @@ def main():
             elif packet.kind == 'winner':
                 controller.show_winner(packet.data)
             elif packet.kind == 'update':
-                controller.update_lifes(packet.data, machine)
+                controller.update_lifes(packet.data)
             elif packet.kind == 'token':
                 dealer = Dealer(controller.handSize, controller.lifes)
                 controller.update_hand(dealer.hands[machine])

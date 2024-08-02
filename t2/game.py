@@ -71,12 +71,15 @@ class Dealer:
             self.lifes[i] -= abs(self.points[i] - self.bets[i])
 
 class Controller:
-    def __init__(self):
+    def __init__(self, player):
         self.cards = []
         self.shackle = None
         self.lifes = [7,7,7,7]
         self.alives = 4
         self.handSize = 1
+        self.bet = 0
+        self.points = 0
+        self.player = player
 
     def update_shackle(self, shackle):
         print ("Manilha: ", shackle)
@@ -86,9 +89,10 @@ class Controller:
         print ("Suas cartas: ", hand)
         self.cards = hand
     
-    def bet(self, bets, machine):
+    def bet(self, bets):
         jogadas = int(input("Quantos pontos você faz: "))
-        bets[machine] = jogadas
+        bets[player] = jogadas
+        self.bet = jogadas
 
     def show_bets(self, bets):
         print ("Apostas: ", end = "")
@@ -97,6 +101,7 @@ class Controller:
         print()
 
     def show_plays(self, plays):
+        print ("Sua aposta: ", self.bet, "Seus pontos: ", self.points)
         print ("Manilha: ", self.shackle)
         print ("Cartas jogadas: ", end = "")
         for play in plays:
@@ -115,10 +120,16 @@ class Controller:
     def show_winner(self, winner):
         os.system('clear')
         print ("Vencedor da rodada: ", winner)
+        if winner == self.player:
+            self.points += 1
 
-    def update_lifes(self, lifes, machine):
+    def update_lifes(self, lifes):
         self.lifes = lifes
-        print("Vidas: ", lifes[machine])
+        msg = "FODA-SE"
+        if self.lifes[self.player] >0:
+            print ("Vidas: ", msg[:self.lifes[self.player]])
+        else:
+            print ("Sem vidas")
         if self.handSize < 13:
             self.handSize+=1 
         self.alives = sum(x>0 for x in self.lifes)
