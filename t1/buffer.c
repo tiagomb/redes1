@@ -75,6 +75,7 @@ unsigned char *monta_buffer(unsigned int sequencia, unsigned int tipo, unsigned 
     pacote->tamanho = tamanho;
     pacote->sequencia = sequencia;
     pacote->tipo = tipo;
+    memset(pacote->dados, 0, TAMANHO);
     memcpy(pacote->dados, dados, tamanho);
     pacote->crc = calculaCRC(&buffer[1], sizeof(protocolo_t) - 2, tabela_crc);
     memcpy(ultimo_enviado, buffer, sizeof(protocolo_t));
@@ -149,8 +150,8 @@ protocolo_t *recebe_confirmacao(int soquete, unsigned int *last_seq){
     inc_seq(last_seq);
     memcpy(ultimo_recebido, buffer, sizeof(protocolo_t));
     if (pacote->tipo == ERRO){
-        int erro;
-        sscanf ((char *) pacote->dados, "%d", &erro);
+        unsigned int erro;
+        memcpy(&erro, pacote->dados, sizeof(unsigned int));
         switch (erro){
             case 1:
                 fprintf(stderr, "Permissao negada\n");
