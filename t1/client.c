@@ -148,6 +148,7 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome, unsigned char 
 			quant++;
 		}
 		snprintf((char *) buffer_sequencia, TAMANHO, "%d", to_send);
+		last_sent = to_send;
 		if (ack){
 			envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
 		} else {
