@@ -25,10 +25,8 @@ unsigned int last_seq = 31;
 
 unsigned char janela[JANELA][sizeof(protocolo_t)];
 
-int retorna_diff(unsigned int sequencia){
-    protocolo_t *pacote = (protocolo_t *) janela[JANELA-1];
-    unsigned int last_seq = pacote->sequencia;
-    int diff = last_seq - sequencia;
+int retorna_diff(unsigned int seq_recebida){
+    int diff = sequencia - seq_recebida;
     if (diff < 0){
         diff += 32;
     }
@@ -90,7 +88,7 @@ void le_arquivo(int soquete, char *nome){
         free(buffer_envio);
         memset(buffer, 0, TAMANHO);
     }
-    while (lidos > 0){
+    while (lidos > 0 || seq_recebida != sequencia){
         confirmacao = recebe_confirmacao(soquete, &last_seq);
         aceito = confirmacao->tipo;
         memcpy(&seq_recebida, confirmacao->dados, sizeof(unsigned int));

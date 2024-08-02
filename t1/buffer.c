@@ -98,9 +98,9 @@ int buffer_eh_valido(protocolo_t *pacote){
     return pacote->marcador == 126;
 }
 
-int recebe_msg(int soquete, unsigned char *buffer, unsigned int timeoutSec){
+int recebe_msg(int soquete, unsigned char *buffer, unsigned int timeoutMili){
     long long int comeco = timestamp();
-    struct timeval timeout = {timeoutSec, timeoutSec * 1000};
+    struct timeval timeout = {timeoutMili/1000, (timeoutMili%1000) * 1000};
     setsockopt(soquete, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     int bytes_recebidos = 0;
     do{
@@ -108,15 +108,15 @@ int recebe_msg(int soquete, unsigned char *buffer, unsigned int timeoutSec){
         if (buffer_eh_valido((protocolo_t*) buffer)){
             return bytes_recebidos;
         }
-    } while (timeoutSec == 0 || timestamp() - comeco <= timeoutSec * 1000);
+    } while (timeoutMili == 0 || timestamp() - comeco <= timeoutMili);
     return -1;
 }
 
-int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq, unsigned int timeoutSec){
-    unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
+int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq, unsigned int timeoutMili){
+    unsigned char *buffer = (unsigned char*) calloc(1, sizeof(protocolo_t));
     protocolo_t *pacote_recebido = (protocolo_t*) buffer;
     int recebido;
-    recebido = recebe_msg(soquete, buffer, timeoutSec);
+    recebido = recebe_msg(soquete, buffer, timeoutMili);
     if (recebido == -1){
         free(buffer);
         return TIMEOUT;
@@ -142,12 +142,12 @@ int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq, unsi
 protocolo_t *recebe_confirmacao(int soquete, unsigned int *last_seq){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
     protocolo_t *pacote = (protocolo_t*) buffer;
-    int recebido = recebe_msg(soquete, buffer, 5);
+    int recebido = recebe_msg(soquete, buffer, 5000);
+    inc_seq(last_seq);
     if (recebido == -1) {
         pacote->tipo = TIMEOUT;
         return pacote;
     }
-    inc_seq(last_seq);
     memcpy(ultimo_recebido, buffer, sizeof(protocolo_t));
     if (pacote->tipo == ERRO){
         unsigned int erro;

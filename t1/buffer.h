@@ -7,6 +7,8 @@
 extern unsigned char ultimo_enviado[67];
 extern unsigned char ultimo_recebido[67];
 
+long long int timestamp();
+
 unsigned int inc_seq(unsigned int *sequencia);
 
 unsigned int dec_seq(unsigned int *sequencia);

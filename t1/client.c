@@ -106,17 +106,21 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome, unsigned char 
 	envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, sizeof(unsigned int));
 	snprintf(caminho, strlen(nome) + 10, "%s/%s", DIRETORIO, nome);
 	FILE *arquivo = fopen(caminho, "w");
-	unsigned int ack = 0, to_send = 0, last_sent = 0, quant = 0;
+	unsigned int ack = 0, to_send = 0, last_sent = 0, removidos;
+	int quant = 0;
+	long long int comeco = timestamp();
 	while (pacote.tipo != FIM_TRANSMISSAO || !ack){
 		while (quant < JANELA){
-			switch(recebe_buffer(soquete, &pacote, &last_seq, 1)){
+			switch(recebe_buffer(soquete, &pacote, &last_seq, 100)){
 				case ACK:
 					ack = 1;
 					to_send = pacote.sequencia;
 					if (pacote.tipo == DADOS){
-						remove_vlan(pacote.dados);
-						fwrite(pacote.dados, 1, pacote.tamanho, arquivo);
+						removidos = remove_vlan(pacote.dados);
+						fwrite(pacote.dados, 1, pacote.tamanho - removidos, arquivo);
 					} else if (pacote.tipo == FIM_TRANSMISSAO){
+						quant = JANELA;
+						printf ("Tempo de download: %lld ms\n", timestamp() - comeco);
 						memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
 						envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, sizeof(unsigned int));
 						fclose(arquivo);
@@ -134,16 +138,13 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome, unsigned char 
 					}
 					break;
 				case TIMEOUT:
-					quant = 0;
-					printf ("Timeout! Reenviando pacotes...\n");
+					quant = -1;
 					memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
 					if (to_send != last_sent){
 						last_sent = to_send;
 						if (ack) {
-							printf ("Enviando ACK para %d\n", to_send);
 							envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, sizeof(unsigned int));
 						} else {
-							printf ("Enviando NACK para %d\n", to_send);
 							envia_buffer(soquete, inc_seq(&sequencia), NACK, buffer_sequencia, sizeof(unsigned int));
 						}
 					}
@@ -157,10 +158,8 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome, unsigned char 
 		memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
 		last_sent = to_send;
 		if (ack){
-			printf ("Enviando ACK para %d\n", to_send);
 			envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, sizeof(unsigned int));
 		} else {
-			printf ("Enviando NACK para %d\n", to_send);
 			envia_buffer(soquete, inc_seq(&sequencia), NACK, buffer_sequencia, sizeof(unsigned int));
 		}
 	}
