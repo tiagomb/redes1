@@ -104,44 +104,54 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome, unsigned char 
 	envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
 	snprintf(caminho, strlen(nome) + 10, "%s/%s", DIRETORIO, nome);
 	FILE *arquivo = fopen(caminho, "w");
-	int ack = 0, to_send = -1, last_sent = -1;
+	int ack = 0, to_send = -1, last_sent = -1, quant = 0;
 	while (pacote.tipo != FIM_TRANSMISSAO || !ack){
-		switch(recebe_buffer(soquete, &pacote, &last_seq, 1)){
-			case ACK:
-				ack = 1;
-				to_send = pacote.sequencia;
-				if (pacote.tipo == DADOS){
-					remove_vlan(pacote.dados);
-					fwrite(pacote.dados, 1, pacote.tamanho, arquivo);
-				} else if (pacote.tipo == FIM_TRANSMISSAO){
-					envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
-					fclose(arquivo);
-					free(buffer);
-					toca_video(soquete, caminho);
-				}
-				break;
-			case NACK:
-				if (!verifica_sequencias(pacote, last_seq)){
-					ack = 0;
-					to_send = (last_seq + 1) % 32;
-				} else {
+		while (quant < JANELA){
+			switch(recebe_buffer(soquete, &pacote, &last_seq, 1)){
+				case ACK:
 					ack = 1;
 					to_send = pacote.sequencia;
-				}
-				break;
-			case TIMEOUT:
-				snprintf((char *) buffer_sequencia, TAMANHO, "%d", to_send);
-				if (to_send != last_sent){
-					last_sent = to_send;
-					if (ack){
+					if (pacote.tipo == DADOS){
+						remove_vlan(pacote.dados);
+						fwrite(pacote.dados, 1, pacote.tamanho, arquivo);
+					} else if (pacote.tipo == FIM_TRANSMISSAO){
 						envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
-					} else {
-						envia_buffer(soquete, inc_seq(&sequencia), NACK, buffer_sequencia, strlen((char *) buffer_sequencia));
+						fclose(arquivo);
+						free(buffer);
+						toca_video(soquete, caminho);
 					}
-				}
-				break;
-			default:
-				break;
+					break;
+				case NACK:
+					if (!verifica_sequencias(pacote, last_seq)){
+						ack = 0;
+						to_send = (last_seq + 1) % 32;
+					} else {
+						ack = 1;
+						to_send = pacote.sequencia;
+					}
+					break;
+				case TIMEOUT:
+					quant = 0;
+					snprintf((char *) buffer_sequencia, TAMANHO, "%d", to_send);
+					if (to_send != last_sent){
+						last_sent = to_send;
+						if (ack) {
+							envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
+						} else {
+							envia_buffer(soquete, inc_seq(&sequencia), NACK, buffer_sequencia, strlen((char *) buffer_sequencia));
+						}
+					}
+					break;
+				default:
+					break;
+			}
+			quant++;
+		}
+		snprintf((char *) buffer_sequencia, TAMANHO, "%d", to_send);
+		if (ack){
+			envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, strlen((char *) buffer_sequencia));
+		} else {
+			envia_buffer(soquete, inc_seq(&sequencia), NACK, buffer_sequencia, strlen((char *) buffer_sequencia));
 		}
 	}
 }
