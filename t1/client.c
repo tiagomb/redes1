@@ -108,7 +108,6 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome, unsigned char 
 	FILE *arquivo = fopen(caminho, "w");
 	unsigned int ack = 0, to_send = 0, last_sent = 0, removidos;
 	int quant = 0;
-	long long int comeco = timestamp();
 	while (pacote.tipo != FIM_TRANSMISSAO || !ack){
 		while (quant < JANELA){
 			switch(recebe_buffer(soquete, &pacote, &last_seq, 100)){
@@ -120,7 +119,6 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome, unsigned char 
 						fwrite(pacote.dados, 1, pacote.tamanho - removidos, arquivo);
 					} else if (pacote.tipo == FIM_TRANSMISSAO){
 						quant = JANELA;
-						printf ("Tempo de download: %lld ms\n", timestamp() - comeco);
 						memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
 						envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, sizeof(unsigned int));
 						fclose(arquivo);
