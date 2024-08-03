@@ -91,13 +91,8 @@ void lista_videos(int soquete, unsigned char *buffer_sequencia){
 void le_arquivo(int soquete, char *nome){
     FILE *arquivo = fopen(nome, "rb");
     unsigned char *buffer = malloc(TAMANHO);
-    int lidos = 0, aceito = -1, diff = 0;
-    for (int i = 0; i < JANELA; i++){
-        muda_frame(&lidos, buffer, janela[i], arquivo);
-        send(soquete, janela[i], sizeof(protocolo_t), 0);
-    }
-    while (lidos > 0){
-        extrai_confirmacao(soquete, &aceito, &diff);
+    int lidos = 1, aceito = ACK, diff = 0;
+    while (lidos > 0 || aceito != ACK){
         switch (aceito){
             case ACK:
                 for (int i = 0; i < diff; i++){
@@ -127,14 +122,6 @@ void le_arquivo(int soquete, char *nome){
                     send(soquete, janela[i], sizeof(protocolo_t), 0);
                 }
                 break;
-        }
-    }
-    extrai_confirmacao(soquete, &aceito, &diff);
-    while (diff != 0 || aceito != ACK){
-        if (aceito == NACK){
-            for (int i = 0; i < JANELA; i++){
-                send(soquete, janela[i], sizeof(protocolo_t), 0);
-            }
         }
         extrai_confirmacao(soquete, &aceito, &diff);
     }
