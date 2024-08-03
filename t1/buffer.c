@@ -146,6 +146,7 @@ protocolo_t *recebe_confirmacao(int soquete, unsigned int *last_seq){
     inc_seq(last_seq);
     if (recebido == -1) {
         pacote->tipo = TIMEOUT;
+        dec_seq(last_seq);
         return pacote;
     }
     memcpy(ultimo_recebido, buffer, sizeof(protocolo_t));

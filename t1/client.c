@@ -118,12 +118,12 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome, unsigned char 
 						removidos = remove_vlan(pacote.dados);
 						fwrite(pacote.dados, 1, pacote.tamanho - removidos, arquivo);
 					} else if (pacote.tipo == FIM_TRANSMISSAO){
-						quant = JANELA;
 						memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
 						envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, sizeof(unsigned int));
 						fclose(arquivo);
 						free(buffer);
 						toca_video(soquete, caminho);
+						return;
 					}
 					break;
 				case NACK:
@@ -176,11 +176,13 @@ void recebe_videos(int soquete, protocolo_t pacote, unsigned char *input, unsign
 				break;
 			case NACK:
 				ack = 0;
-				to_send = (last_seq + 1) % 32;
-				memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
 				if (pacote.sequencia == last_seq){
-					send(soquete, ultimo_enviado, sizeof(protocolo_t), 0);
+					to_send = last_seq;
+					memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
+					envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, sizeof(unsigned int));
 				} else {
+					to_send = (last_seq + 1) % 32;
+					memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
 					envia_buffer(soquete, inc_seq(&sequencia), NACK, buffer_sequencia, sizeof(unsigned int));
 				}
 				break;
@@ -221,10 +223,12 @@ void trata_pacote(int soquete, unsigned char *input, unsigned char *buffer_seque
 			}
 			break;
 		case NACK:
-			to_send = (last_seq + 1) % 32;
 			if (pacote.sequencia == last_seq){
-				send(soquete, ultimo_enviado, sizeof(protocolo_t), 0);
+				to_send = last_seq;
+				memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
+				envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, sizeof(unsigned int));
 			} else {
+				to_send = (last_seq + 1) % 32;
 				memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
 				envia_buffer(soquete, inc_seq(&sequencia), NACK, buffer_sequencia, sizeof(unsigned int));
 			}

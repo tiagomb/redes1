@@ -25,12 +25,28 @@ unsigned int last_seq = 31;
 
 unsigned char janela[JANELA][sizeof(protocolo_t)];
 
-int retorna_diff(unsigned int seq_recebida){
-    int diff = sequencia - seq_recebida;
-    if (diff < 0){
-        diff += 32;
+void muda_frame(int *lidos, unsigned char *buffer, unsigned char *frame, FILE *arquivo){
+    int removidos;
+    unsigned char *buffer_envio;
+    *lidos = fread(buffer, 1, TAMANHO, arquivo);
+    removidos = insere_vlan(buffer);
+    fseek(arquivo, -removidos, SEEK_CUR);
+    buffer_envio = monta_buffer(inc_seq(&sequencia), DADOS, buffer, *lidos);
+    memcpy(frame, buffer_envio, sizeof(protocolo_t));
+    free(buffer_envio);
+    memset(buffer, 0, TAMANHO);
+}
+
+void extrai_confirmacao(int soquete, unsigned int *aceito, int *diff){
+    protocolo_t *confirmacao = recebe_confirmacao(soquete, &last_seq);
+    unsigned int seq_recebida;
+    *aceito = confirmacao->tipo;
+    memcpy(&seq_recebida, confirmacao->dados, sizeof(unsigned int));
+    *diff = sequencia - seq_recebida;
+    if (*diff < 0){
+        *diff += 32;
     }
-    return diff;
+    free(confirmacao);
 }
 
 void lista_videos(int soquete, unsigned char *buffer_sequencia){
@@ -75,38 +91,22 @@ void lista_videos(int soquete, unsigned char *buffer_sequencia){
 void le_arquivo(int soquete, char *nome){
     FILE *arquivo = fopen(nome, "rb");
     unsigned char *buffer = malloc(TAMANHO);
-    unsigned char* buffer_envio;
-    int removidos, lidos = 0, aceito = -1, seq_recebida = 0, diff = 0;
+    int lidos = 0, aceito = -1, diff = 0;
     protocolo_t *confirmacao;
     for (int i = 0; i < JANELA; i++){
-        lidos = fread(buffer, 1, TAMANHO, arquivo);
-        removidos = insere_vlan(buffer);
-        fseek(arquivo, -removidos, SEEK_CUR);
-        buffer_envio = monta_buffer(inc_seq(&sequencia), DADOS, buffer, lidos);
-        memcpy(janela[i], buffer_envio, sizeof(protocolo_t));
+        muda_frame(&lidos, buffer, janela[i], arquivo);
         send(soquete, janela[i], sizeof(protocolo_t), 0);
-        free(buffer_envio);
-        memset(buffer, 0, TAMANHO);
     }
-    while (lidos > 0 || seq_recebida != sequencia){
-        confirmacao = recebe_confirmacao(soquete, &last_seq);
-        aceito = confirmacao->tipo;
-        memcpy(&seq_recebida, confirmacao->dados, sizeof(unsigned int));
-        diff = retorna_diff(seq_recebida);
+    while (lidos > 0){
+        extrai_confirmacao(soquete, &aceito, &diff);
         switch (aceito){
             case ACK:
                 for (int i = 0; i < diff; i++){
                     memcpy(janela[i], janela[i+JANELA-diff], sizeof(protocolo_t));
                 }
                 for (int i = diff; i < JANELA; i++){
-                    lidos = fread(buffer, 1, TAMANHO, arquivo);
-                    removidos = insere_vlan(buffer);
-                    fseek(arquivo, -removidos, SEEK_CUR);
-                    buffer_envio = monta_buffer(inc_seq(&sequencia), DADOS, buffer, lidos);
-                    memcpy(janela[i], buffer_envio, sizeof(protocolo_t));
+                    muda_frame(&lidos, buffer, janela[i], arquivo);
                     send(soquete, janela[i], sizeof(protocolo_t), 0);
-                    free(buffer_envio);
-                    memset(buffer, 0, TAMANHO);
                 }
             break;
             case NACK:
@@ -115,12 +115,7 @@ void le_arquivo(int soquete, char *nome){
                     memcpy(janela[i], janela[i+JANELA-diff], sizeof(protocolo_t));
                 }
                 for (int i = diff; i < JANELA; i++){
-                    lidos = fread(buffer, 1, TAMANHO, arquivo);
-                    removidos = insere_vlan(buffer);
-                    fseek(arquivo, -removidos, SEEK_CUR);
-                    buffer_envio = monta_buffer(inc_seq(&sequencia), DADOS, buffer, lidos);
-                    memcpy(janela[i], buffer_envio, sizeof(protocolo_t));
-                    free(buffer_envio);
+                    muda_frame(&lidos, buffer, janela[i], arquivo);
                 }
                 for (int i = 0; i < JANELA; i++){
                     send(soquete, janela[i], sizeof(protocolo_t), 0);
@@ -133,6 +128,15 @@ void le_arquivo(int soquete, char *nome){
                 break;
         }
         free(confirmacao);
+    }
+    extrai_confirmacao(soquete, &aceito, &diff);
+    while (diff != 0 || aceito != ACK){
+        if (aceito == NACK){
+            for (int i = 0; i < JANELA; i++){
+                send(soquete, janela[i], sizeof(protocolo_t), 0);
+            }
+        }
+        extrai_confirmacao(soquete, &aceito, &diff);
     }
     fclose(arquivo);
     free(buffer);
@@ -151,16 +155,19 @@ void manda_video(int soquete, protocolo_t pacote, unsigned char *buffer_sequenci
                 erro = 1;
                 memcpy(buffer, &erro, sizeof(unsigned int));
                 envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, sizeof(unsigned int));
+                free(buffer);
                 break;
             case ENOENT:
                 erro = 2;
                 memcpy(buffer, &erro, sizeof(unsigned int));
                 envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, sizeof(unsigned int));
+                free(buffer);
                 break;
             default:
                 erro = 4;
                 memcpy(buffer, &erro, sizeof(unsigned int));
                 envia_buffer(soquete, inc_seq(&sequencia), ERRO, buffer, sizeof(unsigned int));
+                free(buffer);
                 break;
         }
         exit(erro);
@@ -197,13 +204,15 @@ void trata_pacote(int soquete, unsigned char *buffer_sequencia){
 			}
 			break;
 		case NACK:
-            to_send = (last_seq + 1) % 32;
-            memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
-			if (pacote.sequencia == last_seq){
-				send(soquete, ultimo_enviado, sizeof(protocolo_t), 0);
+            if (pacote.sequencia == last_seq){
+				to_send = last_seq;
+				memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
+				envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, sizeof(unsigned int));
 			} else {
-                envia_buffer(soquete, inc_seq(&sequencia), NACK, buffer_sequencia, sizeof(unsigned int));
-            }
+				to_send = (last_seq + 1) % 32;
+				memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
+				envia_buffer(soquete, inc_seq(&sequencia), NACK, buffer_sequencia, sizeof(unsigned int));
+			}
 			break;
 		default:
 			break;
