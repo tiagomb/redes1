@@ -37,7 +37,7 @@ void muda_frame(int *lidos, unsigned char *buffer, unsigned char *frame, FILE *a
     memset(buffer, 0, TAMANHO);
 }
 
-void extrai_confirmacao(int soquete, unsigned int *aceito, int *diff){
+void extrai_confirmacao(int soquete, int *aceito, int *diff){
     protocolo_t *confirmacao = recebe_confirmacao(soquete, &last_seq);
     unsigned int seq_recebida;
     *aceito = confirmacao->tipo;
@@ -92,7 +92,6 @@ void le_arquivo(int soquete, char *nome){
     FILE *arquivo = fopen(nome, "rb");
     unsigned char *buffer = malloc(TAMANHO);
     int lidos = 0, aceito = -1, diff = 0;
-    protocolo_t *confirmacao;
     for (int i = 0; i < JANELA; i++){
         muda_frame(&lidos, buffer, janela[i], arquivo);
         send(soquete, janela[i], sizeof(protocolo_t), 0);
@@ -127,7 +126,6 @@ void le_arquivo(int soquete, char *nome){
                 }
                 break;
         }
-        free(confirmacao);
     }
     extrai_confirmacao(soquete, &aceito, &diff);
     while (diff != 0 || aceito != ACK){
