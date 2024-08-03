@@ -105,6 +105,8 @@ void le_arquivo(int soquete, char *nome){
                 }
                 for (int i = diff; i < JANELA; i++){
                     muda_frame(&lidos, buffer, janela[i], arquivo);
+                }
+                for (int i = 0; i < JANELA; i++){
                     send(soquete, janela[i], sizeof(protocolo_t), 0);
                 }
             break;
