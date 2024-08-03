@@ -91,6 +91,8 @@ class Controller:
     
     def bet(self, bets):
         jogadas = int(input("Quantos pontos você faz: "))
+        while jogadas < 0 or jogadas > handSize:
+            jogadas = int(input("Digite um valor válido. Quantos pontos você faz: "))
         bets[player] = jogadas
         self.bet = jogadas
 
@@ -114,6 +116,8 @@ class Controller:
             print (f"{i}: {card}", end="  ")
         print()
         num = int(input("Digite o número da carta que deseja jogar: "))
+        while num < 0 or num >= len(self.cards):
+            num = int(input("Digite um valor válido. Digite o número da carta que deseja jogar: "))
         card = self.cards.pop(num)
         return card
 
