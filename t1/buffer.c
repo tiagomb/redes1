@@ -143,11 +143,11 @@ protocolo_t *recebe_confirmacao(int soquete, unsigned int *last_seq){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
     protocolo_t *pacote = (protocolo_t*) buffer;
     int recebido = recebe_msg(soquete, buffer, 5000);
-    *last_seq = pacote->sequencia;
     if (recebido == -1) {
         pacote->tipo = TIMEOUT;
         return pacote;
     }
+    *last_seq = pacote->sequencia;
     memcpy(ultimo_recebido, buffer, sizeof(protocolo_t));
     if (pacote->tipo == ERRO){
         unsigned int erro;
