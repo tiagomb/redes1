@@ -89,14 +89,16 @@ class Controller:
         print ("Suas cartas: ", hand)
         self.cards = hand
     
-    def bet(self, bets):
+    def make_bet(self, bets, destiny):
+        total = sum(bet for bet in bets)
         jogadas = int(input("Quantos pontos você faz: "))
-        while jogadas < 0 or jogadas > handSize:
+        while jogadas > self.handSize or (self.player == destiny and total+jogadas == self.handSize):
             jogadas = int(input("Digite um valor válido. Quantos pontos você faz: "))
-        bets[player] = jogadas
+        bets[self.player] = jogadas
         self.bet = jogadas
 
     def show_bets(self, bets):
+        os.system('clear')
         print ("Apostas: ", end = "")
         for i, aposta in enumerate(bets):
             print(f"Jogador {i}: {aposta}", end = "  ")
@@ -128,6 +130,7 @@ class Controller:
             self.points += 1
 
     def update_lifes(self, lifes):
+        self.bet = self.points = 0
         self.lifes = lifes
         msg = "FODA-SE"
         if self.lifes[self.player] >0:

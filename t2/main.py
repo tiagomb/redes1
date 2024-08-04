@@ -32,7 +32,7 @@ def main():
             elif packet.kind == 'shackle':
                 controller.update_shackle(packet.data)
             elif packet.kind == 'bet':
-                controller.bet(packet.data)
+                controller.make_bet(packet.data, packet.destiny)
             elif packet.kind == 'show':
                 controller.show_bets(packet.data)
             elif packet.kind == 'play':
@@ -61,14 +61,14 @@ def main():
                 con.send_data(config, 'erro', 'error')
                 exit(1)
             if packet.kind == 'shackle':
-                controller.bet(dealer.bets, machine)
+                controller.make_bet(dealer.bets, packet.destiny)
                 con.send_data(config, dealer.bets, 'bet')
             elif packet.kind == 'bet':
                 dealer.bets = packet.data
                 controller.show_bets(dealer.bets)
                 con.send_data(config, dealer.bets, 'show')
             elif packet.kind == 'show':
-                print ("Manilha: ", controller.shackle)
+                controller.show_plays(dealer.plays)
                 card = controller.play()
                 dealer.plays.append([machine, card])
                 con.send_data(config, dealer.plays, 'play')
@@ -80,13 +80,13 @@ def main():
             elif packet.kind == 'winner':
                 if len(controller.cards) > 0:
                     dealer.plays = []
-                    print ("Manilha: ", controller.shackle)
+                    controller.show_plays(dealer.plays)
                     card = controller.play()
                     dealer.plays.append([machine, card])
                     con.send_data(config, dealer.plays, 'play')
                 else:
                     dealer.update_lifes()
-                    controller.update_lifes(dealer.lifes, machine)
+                    controller.update_lifes(dealer.lifes)
                     con.send_data(config, dealer.lifes, 'update')
             else:
                 con.send_data(config, None, 'token')
