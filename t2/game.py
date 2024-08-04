@@ -34,7 +34,7 @@ class Dealer:
         self.deck.shuffle()
         self.hands = self.deck.get_hands(num, 4) if num <=13 else self.deck.get_hands(13, 4)
         self.shackle = self.deck.get_shackle()
-        self.bets = [0,0,0,0]
+        self.bets = []
         self.points = [0,0,0,0]
         self.lifes = vidas
         self.plays = []
@@ -67,8 +67,8 @@ class Dealer:
             self.points[self.winner] += 1
             
     def update_lifes(self):
-        for i in range(4):
-            self.lifes[i] -= abs(self.points[i] - self.bets[i])
+        for bet in self.bets:
+            self.lifes[bet[0]] -= abs(self.points[bet[0]] - bet[1])
 
 class Controller:
     def __init__(self, player):
@@ -90,18 +90,18 @@ class Controller:
         self.cards = hand
     
     def make_bet(self, bets, destiny):
-        total = sum(bet for bet in bets)
+        total = sum(bet[1] for bet in bets)
         jogadas = int(input("Quantos pontos você faz: "))
-        while jogadas > self.handSize or (self.player == destiny and total+jogadas == self.handSize):
+        while jogadas > self.handSize or (len(bets) == self.alives-1 and total+jogadas == self.handSize):
             jogadas = int(input("Digite um valor válido. Quantos pontos você faz: "))
-        bets[self.player] = jogadas
+        bets.append([self.player, jogadas])
         self.bet = jogadas
 
     def show_bets(self, bets):
         os.system('clear')
         print ("Apostas: ", end = "")
         for i, aposta in enumerate(bets):
-            print(f"Jogador {i}: {aposta}", end = "  ")
+            print(f"Jogador {aposta[0]}: {aposta[1]}", end = "  ")
         print()
 
     def show_plays(self, plays):
