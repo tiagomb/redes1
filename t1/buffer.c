@@ -11,18 +11,20 @@ unsigned char ultimo_enviado[67] = { 0 };
 unsigned char ultimo_recebido[67] = { 0 };
 unsigned char tabela_crc[256] = {0, 7, 14, 9, 28, 27, 18, 21, 56, 63, 54, 49, 36, 35, 42, 45, 112, 119, 126, 121, 108, 107, 98, 101, 72, 79, 70, 65, 84, 83, 90, 93, 224, 231, 238, 233, 252, 251, 242, 245, 216, 223, 214, 209, 196, 195, 202, 205, 144, 151, 158, 153, 140, 139, 130, 133, 168, 175, 166, 161, 180, 179, 186, 189, 199, 192, 201, 206, 219, 220, 213, 210, 255, 248, 241, 246, 227, 228, 237, 234, 183, 176, 185, 190, 171, 172, 165, 162, 143, 136, 129, 134, 147, 148, 157, 154, 39, 32, 41, 46, 59, 60, 53, 50, 31, 24, 17, 22, 3, 4, 13, 10, 87, 80, 89, 94, 75, 76, 69, 66, 111, 104, 97, 102, 115, 116, 125, 122, 137, 142, 135, 128, 149, 146, 155, 156, 177, 182, 191, 184, 173, 170, 163, 164, 249, 254, 247, 240, 229, 226, 235, 236, 193, 198, 207, 200, 221, 218, 211, 212, 105, 110, 103, 96, 117, 114, 123, 124, 81, 86, 95, 88, 77, 74, 67, 68, 25, 30, 23, 16, 5, 2, 11, 12, 33, 38, 47, 40, 61, 58, 51, 52, 78, 73, 64, 71, 82, 85, 92, 91, 118, 113, 120, 127, 106, 109, 100, 99, 62, 57, 48, 55, 34, 37, 44, 43, 6, 1, 8, 15, 26, 29, 20, 19, 174, 169, 160, 167, 178, 181, 188, 187, 150, 145, 152, 159, 138, 141, 132, 131, 222, 217, 208, 215, 194, 197, 204, 203, 230, 225, 232, 239, 250, 253, 244, 243};
 
-
+//Retorna o tempo atual em ms
 long long int timestamp(){
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return tv.tv_sec * 1000 + tv.tv_usec/1000;
 }
 
+//Incrementa a sequencia, fazendo aritmética modular para não ultrapassar 32
 unsigned int inc_seq(unsigned int *sequencia){
     *sequencia = (*sequencia + 1) % 32;
     return *sequencia;
 }
 
+//Decrementa a sequencia, considerando que 0 - 1 = 31
 unsigned int dec_seq(unsigned int *sequencia){
     if (*sequencia == 0){
         *sequencia = 31;
@@ -33,6 +35,7 @@ unsigned int dec_seq(unsigned int *sequencia){
     
 }
 
+//Calcula o CRC da mensagem com base na tabela
 unsigned char calculaCRC(unsigned char *message, unsigned int tamanho, unsigned char *table){
     unsigned char crc = 0x00;
     for (int i = 0; i < tamanho; i++){
@@ -41,6 +44,7 @@ unsigned char calculaCRC(unsigned char *message, unsigned int tamanho, unsigned 
     return crc;
 }
 
+//Insere o byte 0xFF após os bytes 0x81 e 0x88 que identificam o protocolo VLAN, para que bytes não sejam perdidos
 int insere_vlan(unsigned char *dados){
     int contador = 0;
     for (int i = 0; i < TAMANHO-1; i++){
@@ -55,6 +59,7 @@ int insere_vlan(unsigned char *dados){
     return contador;
 }
 
+// Remove o byte 0xFF após os bytes 0x81 e 0x88 que identificam o protocolo VLAN
 int remove_vlan(unsigned char *dados){
     int contador = 0;
     for (int i = 1; i < TAMANHO; i++){
@@ -68,6 +73,7 @@ int remove_vlan(unsigned char *dados){
     return contador;
 }
 
+//Recebe como parâmetros os campos da mensagem e monta-a em um buffer. Retorna um ponteiro para o buffer.
 unsigned char *monta_buffer(unsigned int sequencia, unsigned int tipo, unsigned char *dados, unsigned int tamanho){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
     protocolo_t *pacote = (protocolo_t*) buffer;
@@ -82,6 +88,7 @@ unsigned char *monta_buffer(unsigned int sequencia, unsigned int tipo, unsigned 
     return buffer;
 }
 
+// Recebe os campos da mensagem, chama a função para montá-la e envia-a pelo soquete
 int envia_buffer(int soquete, unsigned int sequencia, unsigned int tipo, unsigned char* dados, unsigned int tamanho){
     unsigned char *buffer = monta_buffer(sequencia, tipo, dados, tamanho);
     int enviado = send(soquete, buffer, sizeof(protocolo_t), 0);
@@ -94,10 +101,12 @@ int envia_buffer(int soquete, unsigned int sequencia, unsigned int tipo, unsigne
     return 0;
 }
 
+//Verifica se o buffer recebido é válido através do marcador de início
 int buffer_eh_valido(protocolo_t *pacote){
     return pacote->marcador == 126;
 }
 
+//Recebe uma mensagem pelo soquete e a armazena no buffer. Retorna o número de bytes recebidos, ou -1 em caso de timeout
 int recebe_msg(int soquete, unsigned char *buffer, unsigned int timeoutMili){
     long long int comeco = timestamp();
     struct timeval timeout = {timeoutMili/1000, (timeoutMili%1000) * 1000};
@@ -112,6 +121,8 @@ int recebe_msg(int soquete, unsigned char *buffer, unsigned int timeoutMili){
     return -1;
 }
 
+/* Recebe um pacote que não seja um ACK ou NACK, e verifica se ele é válido. 
+Retorna ACK se o pacote é válido, NACK se o CRC ou sequência está errada, e TIMEOUT se o tempo de espera foi excedido. */
 int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq, unsigned int timeoutMili){
     unsigned char *buffer = (unsigned char*) calloc(1, sizeof(protocolo_t));
     protocolo_t *pacote_recebido = (protocolo_t*) buffer;
@@ -139,6 +150,7 @@ int recebe_buffer(int soquete, protocolo_t *pacote, unsigned int *last_seq, unsi
     return ACK;
 }
 
+//Recebe uma confirmação do envio de um pacote e retorna o pacote recebido, ou sai do programa em caso de erro
 protocolo_t *recebe_confirmacao(int soquete, unsigned int *last_seq){
     unsigned char *buffer = (unsigned char*) malloc(sizeof(protocolo_t));
     protocolo_t *pacote = (protocolo_t*) buffer;
@@ -176,6 +188,7 @@ protocolo_t *recebe_confirmacao(int soquete, unsigned int *last_seq){
     return pacote;
 }
 
+//Envia um pacote e espera a confirmação do recebimento. Se a confirmação for um NACK ou houver timeout, reenvia o pacote, até receber um ACK
 void trata_envio(int soquete, unsigned int *sequencia, unsigned int tipo, unsigned char *dados, unsigned int tamanho, unsigned int *last_seq){
     envia_buffer(soquete, inc_seq(sequencia), tipo, dados, tamanho);
     protocolo_t *pacote = recebe_confirmacao(soquete, last_seq);

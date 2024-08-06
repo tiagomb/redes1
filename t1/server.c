@@ -25,6 +25,7 @@ unsigned int last_seq = 31;
 
 unsigned char janela[JANELA][sizeof(protocolo_t)];
 
+// Atualiza um frame da janela com uma nova leitura do arquivo
 void muda_frame(int *lidos, unsigned char *buffer, unsigned char *frame, FILE *arquivo){
     int removidos;
     unsigned char *buffer_envio;
@@ -37,6 +38,7 @@ void muda_frame(int *lidos, unsigned char *buffer, unsigned char *frame, FILE *a
     memset(buffer, 0, TAMANHO);
 }
 
+// Recebe a confirmação da janela enviada e extrai as informações necessárias, como o tipo da confirmação e a diferença entre a última sequência enviada e a recebida
 void extrai_confirmacao(int soquete, int *aceito, int *diff){
     protocolo_t *confirmacao = recebe_confirmacao(soquete, &last_seq);
     unsigned int seq_recebida;
@@ -49,6 +51,7 @@ void extrai_confirmacao(int soquete, int *aceito, int *diff){
     free(confirmacao);
 }
 
+// Lista os vídeos disponíveis no diretório de vídeos. Se o diretório não existir/for inacessível, envia um erro ao cliente
 void lista_videos(int soquete, unsigned char *buffer_sequencia){
     DIR* diretorio = opendir(DIRETORIO);
     unsigned int erro = 0;
@@ -88,6 +91,7 @@ void lista_videos(int soquete, unsigned char *buffer_sequencia){
     closedir(diretorio);
 }
 
+// Lê o arquivo de vídeo e envia-o em pacotes para o cliente, utilizando uma janela deslizante
 void le_arquivo(int soquete, char *nome){
     FILE *arquivo = fopen(nome, "rb");
     unsigned char *buffer = malloc(TAMANHO);
@@ -130,6 +134,8 @@ void le_arquivo(int soquete, char *nome){
     trata_envio(soquete, &sequencia, FIM_TRANSMISSAO, NULL, 0, &last_seq);
 }
 
+/* Envia o descritor do vídeo para o cliente, e chama a função de leitura do arquivo.
+Caso o arquivo não exista ou seja inacessível, envia um erro ao cliente e encerra a conexão. */
 void manda_video(int soquete, protocolo_t pacote, unsigned char *buffer_sequencia){
     char nome[TAMANHO + 10] = { 0 };
     unsigned char *buffer = malloc(TAMANHO);
@@ -168,6 +174,7 @@ void manda_video(int soquete, protocolo_t pacote, unsigned char *buffer_sequenci
     le_arquivo(soquete, nome);
 }
 
+// Recebe um pacote e trata-o de acordo com o tipo
 void trata_pacote(int soquete, unsigned char *buffer_sequencia){
 	protocolo_t pacote;
     unsigned int to_send;
@@ -176,13 +183,13 @@ void trata_pacote(int soquete, unsigned char *buffer_sequencia){
             to_send = pacote.sequencia;
             memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
 			switch (pacote.tipo){
-				case LISTA:
+				case LISTA: // Lista os vídeos disponíveis no diretório
                     lista_videos(soquete, buffer_sequencia);
 					break;
-				case BAIXAR:
+				case BAIXAR: //Envia o descritor e o arquivo do vídeo solicitado
                     manda_video(soquete, pacote, buffer_sequencia);
 					break;
-                case FIM_TRANSMISSAO:
+                case FIM_TRANSMISSAO: //Encerra a conexão
                     envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, sizeof(unsigned int));
                     exit(0);
                     break;

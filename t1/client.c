@@ -30,6 +30,7 @@
 unsigned int sequencia = 31;
 unsigned int last_seq = 31;
 
+// Verifica se o pacote é duplicado(já foi aceito) ou se está fora de ordem no caso de um NACK. Retorna 1 no primeiro caso e 0 no segundo.
 int verifica_sequencias(protocolo_t pacote, unsigned int last_seq){
 	switch (last_seq){
 		case 0:
@@ -65,11 +66,17 @@ int verifica_sequencias(protocolo_t pacote, unsigned int last_seq){
 	}
 }
 
+//Pergunta ao usuário se ele deseja baixar outro vídeo
 void pergunta_videos(int soquete){
 	printf ("Vídeo baixado com sucesso e rodando! Deseja baixar outro vídeo? (s/n): ");
 	char c;
 	getchar();
 	scanf ("%c", &c);
+	while (c != 's' && c != 'S' && c != 'n' && c != 'N'){
+		printf ("Opção inválida. Deseja baixar outro vídeo? (s/n): ");
+		getchar();
+		scanf ("%c", &c);
+	}
 	if (c == 'n' || c == 'N'){
 		printf ("Encerrando conexão...\n");
 		trata_envio(soquete, &sequencia, FIM_TRANSMISSAO, NULL, 0, &last_seq);
@@ -79,6 +86,7 @@ void pergunta_videos(int soquete){
 	}
 }
 
+// Recebe como parâmetro o caminho do vídeo e o abre em um player de vídeo
 void toca_video(int soquete, char *caminho){
 	char *comando = (char*) malloc(strlen(caminho) + 10);
 	snprintf(comando, strlen(caminho) + 10, "xdg-open %s", caminho);
@@ -88,6 +96,8 @@ void toca_video(int soquete, char *caminho){
 	pergunta_videos(soquete);
 }
 
+/* Recebe o vídeo desejado através de mensagens e escreve-as no arquivo, baixando o vídeo.
+ * Caso o espaço em disco seja insuficiente, envia um erro ao servidor e encerra a conexão.*/
 void escreve_arquivo(int soquete, protocolo_t pacote, char *nome, unsigned char *buffer_sequencia){
 	char *caminho = (char*) malloc(strlen(nome) + 10);
 	unsigned char *buffer = (unsigned char *) malloc(TAMANHO);
@@ -163,6 +173,7 @@ void escreve_arquivo(int soquete, protocolo_t pacote, char *nome, unsigned char 
 	}
 }
 
+// Recebe os vídeos disponíveis no servidor e pergunta ao usuário qual ele deseja assistir
 void recebe_videos(int soquete, protocolo_t pacote, unsigned char *input, unsigned char *buffer_sequencia){
 	unsigned int ack = 0, to_send = 0;
 	while (pacote.tipo != FIM_TRANSMISSAO || !ack){
@@ -196,6 +207,7 @@ void recebe_videos(int soquete, protocolo_t pacote, unsigned char *input, unsign
 	trata_envio(soquete, &sequencia, BAIXAR, input, strlen((char *) input), &last_seq);
 }
 
+// Trata o pacote recebido, chamando as funções necessárias para cada tipo de pacote
 void trata_pacote(int soquete, unsigned char *input, unsigned char *buffer_sequencia){
 	protocolo_t pacote;
 	unsigned int to_send = 0, erro = 0;
@@ -203,14 +215,14 @@ void trata_pacote(int soquete, unsigned char *input, unsigned char *buffer_seque
 		case ACK:
 			to_send = pacote.sequencia;
 			switch (pacote.tipo){
-				case MOSTRAR:
+				case MOSTRAR: //Começo da lista de vídeos
 					printf ("Vídeos disponíveis no servidor: \n");
 					memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
 					envia_buffer(soquete, inc_seq(&sequencia), ACK, buffer_sequencia, sizeof(unsigned int));
 					printf ("%s\n", pacote.dados);
 					recebe_videos(soquete, pacote, input, buffer_sequencia);
 					break;
-				case DESCRITOR:
+				case DESCRITOR: //Recebe as informações do vídeo solicitado
 					memcpy(buffer_sequencia, &to_send, sizeof(unsigned int));
 					escreve_arquivo(soquete, pacote, (char *) input, buffer_sequencia);
 					break;
